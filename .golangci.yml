@@ -1,0 +1,32 @@
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+  govet:
+    enable-all: false
+  staticcheck:
+    checks:
+      - "all"
+
+issues:
+  exclude-rules:
+    # G304: WAL and chunk servers intentionally open files via variable paths.
+    # Paths are always constructed with filepath.Join + filepath.Clean.
+    - linters:
+        - gosec
+      text: "G304:"
+    # Test files are exempt from gosec (no production security risk).
+    - path: "_test\\.go"
+      linters:
+        - gosec
