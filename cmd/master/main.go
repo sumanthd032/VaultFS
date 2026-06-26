@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -28,6 +29,9 @@ import (
 	"github.com/sumanthd032/vaultfs/internal/security"
 	vaultfsv1 "github.com/sumanthd032/vaultfs/proto/vaultfs/v1"
 )
+
+// monitorSweepInterval is how often the master checks chunk-server liveness.
+const monitorSweepInterval = 5 * time.Second
 
 type config struct {
 	nodeID      string
@@ -155,6 +159,13 @@ func run(c config) error {
 
 	mx := metrics.New()
 
+	// Liveness: chunk servers heartbeat the master, the monitor declares dead
+	// nodes after the timeout, and the chunk map lets it find under-replicated
+	// chunks. A dead node also increments the missed-heartbeat metric.
+	chunkMap := metadata.NewChunkMap()
+	monitor := metadata.NewMonitor(chunkMap, 0, c.replication)
+	monitor.OnNodeDead = mx.RecordMissedHeartbeat
+
 	commitCh := make(chan raft.Entry, 256)
 	raftCfg := raft.DefaultConfig(c.nodeID, c.raftPeers, commitCh)
 	raftCfg.OnElection = mx.RecordElection
@@ -169,10 +180,14 @@ func run(c config) error {
 	node.Start(transport)
 	defer node.Stop()
 
-	srv := master.New(ns, leases, node, c.chunkNodes, c.replication, master.WithMetrics(mx))
+	srv := master.New(ns, leases, node, c.chunkNodes, c.replication,
+		master.WithMetrics(mx), master.WithMonitor(monitor), master.WithChunkMap(chunkMap))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go srv.Run(ctx, commitCh)
+	go monitor.Run(ctx, monitorSweepInterval, func(tasks []metadata.ReplicationTask) {
+		slog.Warn("chunks under-replicated", "count", len(tasks))
+	})
 	go func() {
 		if err := mx.Serve(ctx, c.metricsAddr); err != nil {
 			slog.Error("metrics server stopped", "err", err)

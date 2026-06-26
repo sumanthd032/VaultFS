@@ -7,12 +7,15 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -24,11 +27,16 @@ import (
 	vaultfsv1 "github.com/sumanthd032/vaultfs/proto/vaultfs/v1"
 )
 
+// heartbeatInterval is how often the chunk server reports liveness to the
+// masters. With the master's 15s dead timeout this tolerates two missed beats.
+const heartbeatInterval = 5 * time.Second
+
 type config struct {
 	nodeID      string
 	listen      string
 	dataDir     string
 	metricsAddr string
+	masters     []string
 	certFile    string
 	keyFile     string
 	caFile      string
@@ -42,16 +50,30 @@ func envOr(env, def string) string {
 	return def
 }
 
+// splitList splits a comma-separated list, dropping empty entries.
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func parseConfig() config {
 	var c config
 	flag.StringVar(&c.nodeID, "node-id", envOr("VAULTFS_NODE_ID", "chunkserver-0"), "stable node identifier")
 	flag.StringVar(&c.listen, "listen", envOr("VAULTFS_LISTEN", ":9100"), "gRPC listen address")
 	flag.StringVar(&c.dataDir, "data-dir", envOr("VAULTFS_DATA_DIR", "/var/lib/vaultfs/chunks"), "chunk storage directory")
 	flag.StringVar(&c.metricsAddr, "metrics-addr", envOr("VAULTFS_METRICS_ADDR", ":9101"), "Prometheus metrics HTTP address")
+	var masters string
+	flag.StringVar(&masters, "masters", envOr("VAULTFS_MASTERS", ""), "comma-separated master addresses to heartbeat")
 	flag.StringVar(&c.certFile, "cert", envOr("VAULTFS_CERT", "/etc/vaultfs/certs/chunkserver.crt"), "TLS certificate")
 	flag.StringVar(&c.keyFile, "key", envOr("VAULTFS_KEY", "/etc/vaultfs/certs/chunkserver.key"), "TLS private key")
 	flag.StringVar(&c.caFile, "ca", envOr("VAULTFS_CA", "/etc/vaultfs/certs/ca.crt"), "cluster CA certificate")
 	flag.Parse()
+	c.masters = splitList(masters)
 	return c
 }
 
@@ -98,6 +120,7 @@ func run(c config) error {
 			slog.Error("metrics server stopped", "err", err)
 		}
 	}()
+	go heartbeatLoop(ctx, c, store, clientTLS)
 
 	gs := grpc.NewServer(grpc.Creds(credentials.NewTLS(serverTLS)))
 	vaultfsv1.RegisterChunkServiceServer(gs, srv)
@@ -109,6 +132,56 @@ func run(c config) error {
 
 	slog.Info("chunkserver listening", "node", c.nodeID, "addr", c.listen, "data_dir", c.dataDir)
 	return serve(gs, lis)
+}
+
+// heartbeatLoop periodically reports this chunk server's liveness and chunk
+// count to every master over mutual TLS. It broadcasts to all masters so each
+// master's view stays current regardless of which one is the Raft leader. It
+// sends one heartbeat immediately, then on every interval until ctx is done.
+func heartbeatLoop(ctx context.Context, c config, store *chunk.Store, clientTLS *tls.Config) {
+	if len(c.masters) == 0 {
+		slog.Warn("no masters configured; heartbeats disabled", "node", c.nodeID)
+		return
+	}
+
+	var clients []vaultfsv1.MasterServiceClient
+	for _, addr := range c.masters {
+		cc, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(clientTLS)))
+		if err != nil {
+			slog.Error("heartbeat: dial master", "addr", addr, "err", err)
+			continue
+		}
+		defer func() { _ = cc.Close() }()
+		clients = append(clients, vaultfsv1.NewMasterServiceClient(cc))
+	}
+
+	send := func() {
+		count, err := store.Count()
+		if err != nil {
+			slog.Warn("heartbeat: count chunks", "err", err)
+			return
+		}
+		req := &vaultfsv1.HeartbeatRequest{NodeId: c.nodeID, Address: c.listen, ChunkCount: int64(count)}
+		for _, cl := range clients {
+			callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			if _, err := cl.Heartbeat(callCtx, req); err != nil {
+				slog.Debug("heartbeat: send", "node", c.nodeID, "err", err)
+			}
+			cancel()
+		}
+	}
+
+	send()
+	ticker := time.NewTicker(heartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			send()
+		}
+	}
 }
 
 // serve runs the gRPC server until a termination signal arrives, then stops it
