@@ -8,7 +8,6 @@ pass review.
 
 - Go 1.26 or newer
 - `make`
-- `openssl` (for generating local development certificates)
 - Docker and Docker Compose (for the local cluster)
 - `golangci-lint` v2 (`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`)
 

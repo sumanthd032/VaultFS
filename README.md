@@ -85,7 +85,7 @@ Full design rationale lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick Start
 
-Requires Go 1.26+, Docker, and `openssl`.
+Requires Go 1.26+ and Docker. Certificates are generated in pure Go, so no openssl is needed.
 
 ```bash
 git clone https://github.com/sumanthd032/vaultfs.git
