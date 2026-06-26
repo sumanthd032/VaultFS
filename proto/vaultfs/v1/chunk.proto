@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package vaultfs.v1;
+
+// ChunkService is the data-plane API served by every chunk server. It stores,
+// serves, replicates, and deletes content-addressed chunks.
+service ChunkService {
+  rpc WriteChunk(WriteChunkRequest) returns (WriteChunkResponse);
+  rpc ReadChunk(ReadChunkRequest) returns (ReadChunkResponse);
+  rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
+  rpc ReplicateChunk(ReplicateChunkRequest) returns (ReplicateChunkResponse);
+}
+
+message WriteChunkRequest {
+  string chunk_id = 1;
+  bytes data = 2;
+  // downstream lists the remaining chunk servers in the replication chain. The
+  // receiver stores the chunk, then forwards it to downstream[0] with the rest
+  // as that node's chain.
+  repeated string downstream = 3;
+}
+message WriteChunkResponse {
+  string chunk_id = 1;
+}
+
+message ReadChunkRequest {
+  string chunk_id = 1;
+}
+message ReadChunkResponse {
+  bytes data = 1;
+}
+
+message DeleteChunkRequest {
+  string chunk_id = 1;
+}
+message DeleteChunkResponse {}
+
+message ReplicateChunkRequest {
+  string chunk_id = 1;
+  string source_address = 2;
+}
+message ReplicateChunkResponse {
+  string chunk_id = 1;
+}

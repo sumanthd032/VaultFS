@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package vaultfs.v1;
+
+import "vaultfs/v1/types.proto";
+
+// MasterService is the metadata and coordination API served by the master
+// cluster. Clients use it to manage the namespace and to discover where chunks
+// should be written or read.
+service MasterService {
+  rpc CreateFile(CreateFileRequest) returns (CreateFileResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+  rpc Stat(StatRequest) returns (StatResponse);
+  rpc ListDir(ListDirRequest) returns (ListDirResponse);
+  rpc OpenForRead(OpenForReadRequest) returns (OpenForReadResponse);
+  rpc OpenForWrite(OpenForWriteRequest) returns (OpenForWriteResponse);
+  rpc FinalizeWrite(FinalizeWriteRequest) returns (FinalizeWriteResponse);
+  rpc GetLease(GetLeaseRequest) returns (GetLeaseResponse);
+}
+
+message CreateFileRequest {
+  string path = 1;
+}
+message CreateFileResponse {
+  FileInfo file = 1;
+}
+
+message DeleteFileRequest {
+  string path = 1;
+}
+message DeleteFileResponse {}
+
+message StatRequest {
+  string path = 1;
+}
+message StatResponse {
+  FileInfo file = 1;
+}
+
+message ListDirRequest {
+  string path = 1;
+}
+message ListDirResponse {
+  repeated FileInfo entries = 1;
+}
+
+message OpenForReadRequest {
+  string path = 1;
+}
+message OpenForReadResponse {
+  FileInfo file = 1;
+  // locations gives the replica sites for each chunk in file.chunk_ids order.
+  repeated ChunkLocation locations = 2;
+}
+
+message OpenForWriteRequest {
+  string path = 1;
+  // chunk_ids are the content addresses of the chunks the client intends to
+  // write, in order. The master uses them to plan replica placement.
+  repeated string chunk_ids = 2;
+}
+message OpenForWriteResponse {
+  // placements gives the target chunk servers for each requested chunk.
+  repeated ChunkLocation placements = 1;
+}
+
+message FinalizeWriteRequest {
+  string path = 1;
+  repeated string chunk_ids = 2;
+  int64 size = 3;
+}
+message FinalizeWriteResponse {
+  FileInfo file = 1;
+}
+
+message GetLeaseRequest {
+  string chunk_id = 1;
+  string holder = 2;
+}
+message GetLeaseResponse {
+  Lease lease = 1;
+}

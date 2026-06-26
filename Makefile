@@ -22,10 +22,13 @@ build:
 # Proto generation (requires buf)
 # ----------------------------------------------
 
+BUF ?= $(shell go env GOPATH)/bin/buf
+
 proto:
-	@which buf > /dev/null 2>&1 || \
+	@test -x "$(BUF)" || \
 		(echo "buf not installed: go install github.com/bufbuild/buf/cmd/buf@latest" && exit 1)
-	buf generate
+	PATH="$(shell go env GOPATH)/bin:$$PATH" $(BUF) lint
+	PATH="$(shell go env GOPATH)/bin:$$PATH" $(BUF) generate
 
 # ----------------------------------------------
 # Local dev TLS certs (implemented in Step 5)

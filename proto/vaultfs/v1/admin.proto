@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package vaultfs.v1;
+
+import "vaultfs/v1/types.proto";
+
+// AdminService exposes cluster operations and introspection used by the CLI
+// status command and operators.
+service AdminService {
+  rpc ClusterStatus(ClusterStatusRequest) returns (ClusterStatusResponse);
+  rpc TriggerGc(TriggerGcRequest) returns (TriggerGcResponse);
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+}
+
+// NodeState is the liveness of a chunk server as seen by the master.
+enum NodeState {
+  NODE_STATE_UNSPECIFIED = 0;
+  NODE_STATE_ALIVE = 1;
+  NODE_STATE_DEAD = 2;
+}
+
+message NodeStatus {
+  NodeInfo node = 1;
+  NodeState state = 2;
+  int64 chunk_count = 3;
+  int64 last_heartbeat_unix = 4;
+}
+
+message ClusterStatusRequest {}
+message ClusterStatusResponse {
+  string leader_id = 1;
+  uint64 term = 2;
+  int64 file_count = 3;
+  int64 chunk_count = 4;
+  repeated NodeStatus nodes = 5;
+}
+
+message TriggerGcRequest {}
+message TriggerGcResponse {
+  int64 deleted = 1;
+}
+
+message ListNodesRequest {}
+message ListNodesResponse {
+  repeated NodeStatus nodes = 1;
+}
