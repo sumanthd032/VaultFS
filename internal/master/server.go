@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/sumanthd032/vaultfs/internal/metadata"
+	"github.com/sumanthd032/vaultfs/internal/metrics"
 	"github.com/sumanthd032/vaultfs/internal/raft"
 	vaultfsv1 "github.com/sumanthd032/vaultfs/proto/vaultfs/v1"
 )
@@ -53,6 +54,7 @@ type Server struct {
 	chunkNodes []*vaultfsv1.NodeInfo
 	rf         int
 	node       *raft.Node
+	metrics    *metrics.Metrics
 
 	opSeq atomic.Uint64
 
@@ -60,14 +62,22 @@ type Server struct {
 	waiters map[string]chan error
 }
 
+// Option configures a Server.
+type Option func(*Server)
+
+// WithMetrics attaches a metrics sink to the server.
+func WithMetrics(m *metrics.Metrics) Option {
+	return func(s *Server) { s.metrics = m }
+}
+
 // New creates a master Server. node is a started Raft node whose committed
 // entries arrive on commitCh; the caller wires those together. chunkNodes is the
 // set of chunk servers available for placement and rf is the replication factor.
-func New(ns *metadata.Namespace, leases *metadata.LeaseManager, node *raft.Node, chunkNodes []*vaultfsv1.NodeInfo, rf int) *Server {
+func New(ns *metadata.Namespace, leases *metadata.LeaseManager, node *raft.Node, chunkNodes []*vaultfsv1.NodeInfo, rf int, opts ...Option) *Server {
 	if rf <= 0 {
 		rf = metadata.DefaultReplicationFactor
 	}
-	return &Server{
+	s := &Server{
 		ns:         ns,
 		leases:     leases,
 		chunkNodes: chunkNodes,
@@ -75,6 +85,10 @@ func New(ns *metadata.Namespace, leases *metadata.LeaseManager, node *raft.Node,
 		node:       node,
 		waiters:    make(map[string]chan error),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Run consumes committed entries until ctx is cancelled, applying each to the
@@ -255,12 +269,15 @@ func (s *Server) placement() []*vaultfsv1.NodeInfo {
 // CreateFile records an empty file in the namespace.
 func (s *Server) CreateFile(ctx context.Context, req *vaultfsv1.CreateFileRequest) (*vaultfsv1.CreateFileResponse, error) {
 	if err := s.propose(ctx, command{Kind: opCreate, Path: req.GetPath()}); err != nil {
+		s.metrics.RecordOp("create_file", metrics.StatusError)
 		return nil, err
 	}
 	fi, err := s.ns.Stat(req.GetPath())
 	if err != nil {
+		s.metrics.RecordOp("create_file", metrics.StatusError)
 		return nil, status.Errorf(codes.Internal, "post-create stat: %v", err)
 	}
+	s.metrics.RecordOp("create_file", metrics.StatusOK)
 	return &vaultfsv1.CreateFileResponse{File: fileInfoToProto(fi)}, nil
 }
 
@@ -268,20 +285,25 @@ func (s *Server) CreateFile(ctx context.Context, req *vaultfsv1.CreateFileReques
 func (s *Server) FinalizeWrite(ctx context.Context, req *vaultfsv1.FinalizeWriteRequest) (*vaultfsv1.FinalizeWriteResponse, error) {
 	cmd := command{Kind: opFinalize, Path: req.GetPath(), ChunkIDs: req.GetChunkIds(), Size: req.GetSize()}
 	if err := s.propose(ctx, cmd); err != nil {
+		s.metrics.RecordOp("finalize_write", metrics.StatusError)
 		return nil, err
 	}
 	fi, err := s.ns.Stat(req.GetPath())
 	if err != nil {
+		s.metrics.RecordOp("finalize_write", metrics.StatusError)
 		return nil, status.Errorf(codes.Internal, "post-finalize stat: %v", err)
 	}
+	s.metrics.RecordOp("finalize_write", metrics.StatusOK)
 	return &vaultfsv1.FinalizeWriteResponse{File: fileInfoToProto(fi)}, nil
 }
 
 // DeleteFile removes a file from the namespace.
 func (s *Server) DeleteFile(ctx context.Context, req *vaultfsv1.DeleteFileRequest) (*vaultfsv1.DeleteFileResponse, error) {
 	if err := s.propose(ctx, command{Kind: opDelete, Path: req.GetPath()}); err != nil {
+		s.metrics.RecordOp("delete_file", metrics.StatusError)
 		return nil, err
 	}
+	s.metrics.RecordOp("delete_file", metrics.StatusOK)
 	return &vaultfsv1.DeleteFileResponse{}, nil
 }
 
@@ -289,11 +311,15 @@ func (s *Server) DeleteFile(ctx context.Context, req *vaultfsv1.DeleteFileReques
 func (s *Server) GetLease(_ context.Context, req *vaultfsv1.GetLeaseRequest) (*vaultfsv1.GetLeaseResponse, error) {
 	lease, err := s.leases.Grant(req.GetChunkId(), req.GetHolder())
 	if errors.Is(err, metadata.ErrLeaseHeld) {
+		s.metrics.RecordOp("get_lease", metrics.StatusError)
 		return nil, status.Error(codes.FailedPrecondition, "lease held by another node")
 	}
 	if err != nil {
+		s.metrics.RecordOp("get_lease", metrics.StatusError)
 		return nil, status.Errorf(codes.Internal, "grant lease: %v", err)
 	}
+	s.metrics.RecordOp("get_lease", metrics.StatusOK)
+	s.metrics.SetActiveLeases(s.leases.Count())
 	return &vaultfsv1.GetLeaseResponse{Lease: &vaultfsv1.Lease{
 		ChunkId: lease.ChunkID, Holder: lease.Holder, ExpiryUnix: lease.Expiry.Unix(),
 	}}, nil

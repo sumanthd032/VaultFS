@@ -7,11 +7,13 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/sumanthd032/vaultfs/internal/chunk"
+	"github.com/sumanthd032/vaultfs/internal/metrics"
 	vaultfsv1 "github.com/sumanthd032/vaultfs/proto/vaultfs/v1"
 )
 
@@ -24,39 +26,57 @@ type Dialer func(ctx context.Context, addr string) (client vaultfsv1.ChunkServic
 type Server struct {
 	vaultfsv1.UnimplementedChunkServiceServer
 
-	store  *chunk.Store
-	nodeID string
-	dial   Dialer
+	store   *chunk.Store
+	nodeID  string
+	dial    Dialer
+	metrics *metrics.Metrics
+}
+
+// Option configures a Server.
+type Option func(*Server)
+
+// WithMetrics attaches a metrics sink to the server.
+func WithMetrics(m *metrics.Metrics) Option {
+	return func(s *Server) { s.metrics = m }
 }
 
 // New returns a chunk Server backed by store. dial is used to forward chunks to
 // downstream replicas; if nil, forwarding is disabled (single-replica writes).
-func New(nodeID string, store *chunk.Store, dial Dialer) *Server {
-	return &Server{store: store, nodeID: nodeID, dial: dial}
+func New(nodeID string, store *chunk.Store, dial Dialer, opts ...Option) *Server {
+	s := &Server{store: store, nodeID: nodeID, dial: dial}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // WriteChunk stores the chunk locally, verifying its content address, then
 // forwards it to the next chunk server in the downstream chain.
 func (s *Server) WriteChunk(ctx context.Context, req *vaultfsv1.WriteChunkRequest) (*vaultfsv1.WriteChunkResponse, error) {
 	if err := chunk.Verify(chunk.ChunkID(req.GetChunkId()), req.GetData()); err != nil {
+		s.metrics.RecordOp("chunk_write", metrics.StatusError)
 		return nil, status.Errorf(codes.InvalidArgument, "chunk id does not match data: %v", err)
 	}
 	id, err := s.store.WriteChunk(ctx, req.GetData())
 	if err != nil {
+		s.metrics.RecordOp("chunk_write", metrics.StatusError)
 		return nil, status.Errorf(codes.Internal, "store chunk: %v", err)
 	}
 
 	if ds := req.GetDownstream(); len(ds) > 0 && s.dial != nil {
 		if err := s.forward(ctx, ds, req); err != nil {
+			s.metrics.RecordOp("chunk_write", metrics.StatusError)
 			return nil, err
 		}
 	}
+	s.metrics.RecordOp("chunk_write", metrics.StatusOK)
 	slog.Debug("chunk stored", "node", s.nodeID, "chunk_id", id, "downstream", len(req.GetDownstream()))
 	return &vaultfsv1.WriteChunkResponse{ChunkId: string(id)}, nil
 }
 
 // forward sends the chunk to the head of the downstream chain, passing the rest
-// of the chain along.
+// of the chain along. The round-trip latency to the downstream replica is
+// recorded as replication lag for that node.
 func (s *Server) forward(ctx context.Context, downstream []string, req *vaultfsv1.WriteChunkRequest) error {
 	next := downstream[0]
 	cli, cleanup, err := s.dial(ctx, next)
@@ -65,11 +85,13 @@ func (s *Server) forward(ctx context.Context, downstream []string, req *vaultfsv
 	}
 	defer cleanup()
 
+	start := time.Now()
 	if _, err := cli.WriteChunk(ctx, &vaultfsv1.WriteChunkRequest{
 		ChunkId: req.GetChunkId(), Data: req.GetData(), Downstream: downstream[1:],
 	}); err != nil {
 		return status.Errorf(codes.Unavailable, "forward to %s: %v", next, err)
 	}
+	s.metrics.SetReplicationLag(next, time.Since(start))
 	return nil
 }
 
@@ -77,11 +99,14 @@ func (s *Server) forward(ctx context.Context, downstream []string, req *vaultfsv
 func (s *Server) ReadChunk(ctx context.Context, req *vaultfsv1.ReadChunkRequest) (*vaultfsv1.ReadChunkResponse, error) {
 	data, err := s.store.ReadChunk(ctx, chunk.ChunkID(req.GetChunkId()))
 	if errors.Is(err, chunk.ErrChunkNotFound) {
+		s.metrics.RecordOp("chunk_read", metrics.StatusError)
 		return nil, status.Errorf(codes.NotFound, "chunk %s not found", req.GetChunkId())
 	}
 	if err != nil {
+		s.metrics.RecordOp("chunk_read", metrics.StatusError)
 		return nil, status.Errorf(codes.DataLoss, "read chunk: %v", err)
 	}
+	s.metrics.RecordOp("chunk_read", metrics.StatusOK)
 	return &vaultfsv1.ReadChunkResponse{Data: data}, nil
 }
 
