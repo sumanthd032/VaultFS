@@ -17,4 +17,5 @@ data:
   VAULTFS_REPLICATION: "3"
   VAULTFS_CA: /etc/vaultfs/certs/ca.crt
   VAULTFS_RAFT_PEERS: "vaultfs-master-0.vaultfs-master:9200,vaultfs-master-1.vaultfs-master:9200,vaultfs-master-2.vaultfs-master:9200"
+  VAULTFS_MASTERS: "vaultfs-master-0.vaultfs-master:9000,vaultfs-master-1.vaultfs-master:9000,vaultfs-master-2.vaultfs-master:9000"
   VAULTFS_CHUNKSERVERS: "vaultfs-chunkserver-0@vaultfs-chunkserver-0.vaultfs-chunkserver:9100,vaultfs-chunkserver-1@vaultfs-chunkserver-1.vaultfs-chunkserver:9100,vaultfs-chunkserver-2@vaultfs-chunkserver-2.vaultfs-chunkserver:9100"

@@ -18,6 +18,7 @@ x-master-env: &master-env
 
 x-chunk-env: &chunk-env
   VAULTFS_LISTEN: ":9100"
+  VAULTFS_MASTERS: "master-0:9000,master-1:9000,master-2:9000"
   VAULTFS_DATA_DIR: /var/lib/vaultfs/chunks
   VAULTFS_CERT: /etc/vaultfs/certs/chunkserver.crt
   VAULTFS_KEY: /etc/vaultfs/certs/chunkserver.key
