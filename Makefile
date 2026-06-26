@@ -36,13 +36,7 @@ proto:
 
 certs:
 	@which openssl > /dev/null 2>&1 || (echo "openssl not installed" && exit 1)
-	@mkdir -p deploy/certs
-	@echo "Generating cluster CA..."
-	@openssl genrsa -out deploy/certs/ca.key 4096 2>/dev/null
-	@openssl req -new -x509 -key deploy/certs/ca.key \
-		-out deploy/certs/ca.crt -days 3650 \
-		-subj "/CN=VaultFS-CA" 2>/dev/null
-	@echo "Certs written to deploy/certs/ (gitignored)"
+	@bash deploy/gen-certs.sh deploy/certs
 
 # ----------------------------------------------
 # Local cluster via Docker Compose (Step 5)
