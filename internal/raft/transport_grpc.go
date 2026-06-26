@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/encoding"
 )
@@ -112,23 +113,52 @@ func handleInstallSnapshotGRPC(srv interface{}, ctx context.Context, dec func(in
 // GRPCTransport is a production Transport that sends Raft RPCs over gRPC using
 // gob encoding. Use NewGRPCTransport to create one.
 type GRPCTransport struct {
-	mu      sync.RWMutex // protects conns
-	id      string
-	server  *grpc.Server
-	conns   map[string]*grpc.ClientConn // peer addr -> connection
-	handler RPCHandler
+	mu         sync.RWMutex // protects conns
+	id         string
+	server     *grpc.Server
+	conns      map[string]*grpc.ClientConn // peer addr -> connection
+	handler    RPCHandler
+	clientCred credentials.TransportCredentials
+}
+
+// GRPCOption configures a GRPCTransport.
+type GRPCOption func(*grpcOptions)
+
+type grpcOptions struct {
+	serverCred credentials.TransportCredentials
+	clientCred credentials.TransportCredentials
+}
+
+// WithTLS secures the Raft transport with mutual TLS: serverCred authenticates
+// inbound peers, clientCred authenticates this node when dialing peers.
+func WithTLS(serverCred, clientCred credentials.TransportCredentials) GRPCOption {
+	return func(o *grpcOptions) {
+		o.serverCred = serverCred
+		o.clientCred = clientCred
+	}
 }
 
 // NewGRPCTransport creates a GRPCTransport that listens on addr.
-// Connections to peers are established lazily on first use.
-func NewGRPCTransport(addr string) (*GRPCTransport, error) {
+// Connections to peers are established lazily on first use. Without options the
+// transport is insecure; pass WithTLS to enable mutual TLS.
+func NewGRPCTransport(addr string, opts ...GRPCOption) (*GRPCTransport, error) {
 	// Register gob codec once so both client and server use it.
 	encoding.RegisterCodec(gobCodec{})
 
-	srv := grpc.NewServer()
+	var o grpcOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	var srvOpts []grpc.ServerOption
+	if o.serverCred != nil {
+		srvOpts = append(srvOpts, grpc.Creds(o.serverCred))
+	}
+	srv := grpc.NewServer(srvOpts...)
 	t := &GRPCTransport{
-		server: srv,
-		conns:  make(map[string]*grpc.ClientConn),
+		server:     srv,
+		conns:      make(map[string]*grpc.ClientConn),
+		clientCred: o.clientCred,
 	}
 
 	ln, err := net.Listen("tcp", addr)
@@ -175,7 +205,11 @@ func (t *GRPCTransport) conn(peer string) (*grpc.ClientConn, error) {
 	if c, ok = t.conns[peer]; ok {
 		return c, nil
 	}
-	c, err := grpc.NewClient(peer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cred := t.clientCred
+	if cred == nil {
+		cred = insecure.NewCredentials()
+	}
+	c, err := grpc.NewClient(peer, grpc.WithTransportCredentials(cred))
 	if err != nil {
 		return nil, fmt.Errorf("raft: dial %s: %w", peer, err)
 	}
