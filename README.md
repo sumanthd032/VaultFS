@@ -2,115 +2,244 @@
 
 # VaultFS
 
-**A production-grade distributed filesystem built from first principles in Go.**
+**A distributed filesystem built from first principles in Go.**
 
-Inspired by the Google File System paper. Built for correctness, durability, and operational clarity.
+Content-addressed chunk storage, a custom Raft master cluster, lease-based write
+coordination, mutual TLS, and first-class observability. Inspired by the Google
+File System paper and built for correctness, durability, and operational clarity.
 
-[![CI](https://github.com/sumanthd032/vaultfs/actions/workflows/ci.yml/badge.svg)](https://github.com/sumanthd032/vaultfs/actions)
-[![Go Version](https://img.shields.io/badge/go-1.26+-00ADD8?logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/sumanthd032/vaultfs/actions/workflows/ci.yml/badge.svg)](https://github.com/sumanthd032/vaultfs/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/sumanthd032/vaultfs.svg)](https://pkg.go.dev/github.com/sumanthd032/vaultfs)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sumanthd032/vaultfs)](https://goreportcard.com/report/github.com/sumanthd032/vaultfs)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/sumanthd032/vaultfs)](go.mod)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+[Quick Start](#quick-start) - [Architecture](#architecture) - [Usage](#usage) - [Deployment](#deployment) - [Documentation](#documentation)
 
 </div>
 
 ---
 
-## What Is VaultFS
+## Overview
 
-VaultFS is a distributed filesystem that spreads your data across multiple machines while presenting a single unified namespace. Files are split into fixed-size chunks, each chunk replicated three times across different nodes. A Raft-based master cluster tracks where every chunk lives. Clients read and write as if talking to one machine.
+VaultFS spreads your data across many machines while presenting a single unified
+namespace. Files are split into fixed-size chunks; every chunk is identified by
+the SHA-256 of its contents and replicated three times across different nodes. A
+Raft-based master cluster tracks where each chunk lives and coordinates writes
+with time-bound leases. Clients read and write as though they were talking to a
+single machine.
 
-**Core guarantees:**
-- No data loss - write-ahead logs on every node, fsync before ack
-- No silent corruption - every chunk is SHA-256 fingerprinted
-- No single point of failure - 3-node Raft master cluster, automatic leader election
-- No stale reads - lease-based write coordination prevents split-brain
+It is written from scratch, including the consensus layer, to be readable end to
+end rather than gluing together existing libraries.
+
+## Highlights
+
+- **No data loss.** Every node fronts its storage with a write-ahead log and
+  fsyncs before acknowledging a write.
+- **No silent corruption.** Chunks are content-addressed by SHA-256 and verified
+  on every read.
+- **No single point of failure.** A three-node Raft master cluster elects a
+  leader automatically and replicates the namespace through its log.
+- **No split-brain writes.** A lease manager grants one primary per chunk for a
+  bounded window, serializing mutations.
+- **Secure by default.** Every connection between every component is mutually
+  authenticated with TLS 1.3.
+- **Observable out of the box.** Each daemon exports Prometheus metrics with a
+  ready-made Grafana dashboard and alerting rules.
 
 ## Architecture
 
-```
-Clients (CLI | Go SDK | REST gateway)
-         |
-         | gRPC + mTLS
-         v
-+---------------------------------+
-|   Master Cluster (Raft, 3 nodes) |
-|   Namespace | Chunk map | Leases |
-+----------+----------------------+
-           | gRPC + mTLS
-    +------+------+
-    v      v      v
- CS-0   CS-1   CS-2    <- Chunk servers (StatefulSet in K8s)
-SHA-256 | WAL | Replication factor 3
+```mermaid
+flowchart TD
+    Client["Client<br/>(CLI / Go SDK)"]
+
+    subgraph Masters["Master cluster (Raft consensus)"]
+        direction LR
+        M0["master-0<br/>leader"]
+        M1["master-1"]
+        M2["master-2"]
+        M0 <--> M1
+        M1 <--> M2
+        M0 <--> M2
+    end
+
+    subgraph Chunks["Chunk servers (replication factor 3)"]
+        direction LR
+        CS0["chunkserver-0"]
+        CS1["chunkserver-1"]
+        CS2["chunkserver-2"]
+        CS0 --> CS1 --> CS2
+    end
+
+    Client -- "1. namespace lookup + lease<br/>gRPC + mTLS" --> Masters
+    Client -- "2. read / write chunks<br/>gRPC + mTLS" --> Chunks
 ```
 
-Full architecture details -> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+A write splits the file into chunks, asks a master where each chunk should live,
+then streams the bytes through a replication chain of chunk servers. A read asks
+a master for the chunk locations and pulls the data directly from the chunk
+servers, verifying each SHA-256 on the way in. The master is never on the data
+path.
+
+Full design rationale lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick Start
 
+Requires Go 1.26+, Docker, and `openssl`.
+
 ```bash
-# Clone
 git clone https://github.com/sumanthd032/vaultfs.git
 cd vaultfs
 
-# Generate certs and start full cluster (requires Docker)
-make certs
-make dev
-
-# In another terminal - use the CLI
-vaultfs put ./myfile.txt /remote/myfile.txt
-vaultfs get /remote/myfile.txt ./downloaded.txt
-vaultfs ls /remote/
-vaultfs status
+make certs    # generate the local development PKI
+make dev      # build images and start the full cluster (masters, chunk servers, Prometheus, Grafana)
 ```
 
-Open Grafana at http://localhost:3000 (admin/admin) to see the live cluster dashboard.
+In another terminal, build the CLI and talk to the cluster over mTLS:
+
+```bash
+make build
+
+# the cluster requires client certificates, so wrap the flags in an alias
+alias vfs='./bin/vaultfs --masters localhost:9000 \
+  --cert deploy/certs/client.crt \
+  --key  deploy/certs/client.key \
+  --ca   deploy/certs/ca.crt'
+
+vfs put ./README.md /docs/readme.md
+vfs ls  /docs
+vfs get /docs/readme.md ./out.md
+vfs status
+```
+
+Open Grafana at [http://localhost:3000](http://localhost:3000) to watch the live
+cluster dashboard.
+
+## Usage
+
+| Command | Description |
+|---------|-------------|
+| `vaultfs put <local> <remote>` | Chunk a file and write it with replication factor 3 |
+| `vaultfs get <remote> <local>` | Fetch a file and verify every chunk |
+| `vaultfs ls <path>` | List a directory in the namespace |
+| `vaultfs rm <path>` | Delete a file |
+| `vaultfs status` | Show the Raft leader, term, and known chunk servers |
+
+Global flags: `--masters` (comma-separated addresses), `--timeout`, and the
+`--cert` / `--key` / `--ca` mTLS material.
+
+### Go SDK
+
+```go
+import "github.com/sumanthd032/vaultfs/pkg/client"
+
+c, err := client.New(client.Config{MasterAddrs: []string{"localhost:9000"}})
+if err != nil {
+    return err
+}
+defer c.Close()
+
+if err := c.Put(ctx, "./local.txt", "/remote/local.txt"); err != nil {
+    return err
+}
+```
+
+Pass `client.Config.DialOptions` to dial the cluster over mTLS. See the
+[package reference](https://pkg.go.dev/github.com/sumanthd032/vaultfs/pkg/client)
+for the full API.
+
+## Observability
+
+Every master and chunk server exposes a Prometheus `/metrics` endpoint (masters
+on `:9001`, chunk servers on `:9101`) reporting six metrics: operation counts,
+WAL write latency, Raft elections, replication lag, missed heartbeats, and active
+leases. The repository ships a Grafana dashboard and Prometheus alerting rules
+under [`deploy/`](deploy), wired into both the Docker Compose stack and the
+Kubernetes manifests.
+
+## Deployment
+
+### Local cluster (Docker Compose)
+
+```bash
+make certs
+make dev
+```
+
+### Kubernetes
+
+The manifests in [`deploy/k8s`](deploy/k8s) run the masters and chunk servers as
+StatefulSets with stable network identities, persistent volumes, health probes,
+and a Prometheus `ServiceMonitor`.
+
+```bash
+make certs
+kubectl apply -k deploy/k8s
+kubectl create secret generic vaultfs-certs -n vaultfs \
+  --from-file=ca.crt=deploy/certs/ca.crt \
+  --from-file=master.crt=deploy/certs/master.crt \
+  --from-file=master.key=deploy/certs/master.key \
+  --from-file=chunkserver.crt=deploy/certs/chunkserver.crt \
+  --from-file=chunkserver.key=deploy/certs/chunkserver.key
+```
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
-| Language | Go 1.26+ |
-| RPC | gRPC + Protocol Buffers |
-| Consensus | Custom Raft |
+| Area | Choice |
+|------|--------|
+| Language | Go 1.26 |
+| RPC | gRPC and Protocol Buffers |
+| Consensus | Custom Raft (election, log replication, snapshots) |
 | Metadata store | BadgerDB |
-| Observability | Prometheus + Grafana |
-| Security | mTLS (cert-manager ready) |
+| Security | Mutual TLS 1.3 (cert-manager ready) |
+| Observability | Prometheus and Grafana |
 | Local dev | Docker Compose |
 | Production | Kubernetes (StatefulSets) |
-| CI/CD | GitHub Actions |
+| CI/CD | GitHub Actions, images published to GHCR |
 
-Full rationale -> [docs/TECH_STACK.md](docs/TECH_STACK.md)
+Full rationale lives in [docs/TECH_STACK.md](docs/TECH_STACK.md).
 
 ## Development
 
 ```bash
-make test          # run all tests
-make lint          # golangci-lint
-make proto         # regenerate protobuf
-make build         # build all binaries
-make docker-build  # build Docker images
+make test          # run all tests with the race detector
+make lint          # golangci-lint (zero issues required)
+make proto         # regenerate protobuf from .proto files
+make build         # build all binaries into bin/
+make docker-build  # build all Docker images
 ```
 
-## Project Structure
-
-```
-cmd/             CLI + node entrypoints
-internal/        Core library (wal, raft, clock, chunk, metadata, metrics, security)
-pkg/client/      Public Go SDK
-proto/           gRPC definitions
-deploy/          Docker Compose + Kubernetes manifests
-docs/            Architecture, tech stack, conventions
+```text
+cmd/         CLI and node entry points (master, chunkserver, vaultfs)
+internal/    Core library: wal, raft, clock, chunk, metadata, metrics, security
+pkg/client/  Public Go SDK
+proto/       gRPC service definitions
+deploy/      Docker Compose, Kubernetes manifests, dashboards, alerting rules
+docs/        Architecture, tech stack, and conventions
 ```
 
-## Key Design Decisions
+## Design Notes
 
-**Why custom Raft?** Using etcd/raft would hide the most interesting part of the system. The implementation is readable and documented to serve as a learning reference.
+**Why a custom Raft?** Reaching for `etcd/raft` would hide the most interesting
+part of the system. The implementation is deliberately readable and documented so
+it can serve as a reference.
 
-**Why BadgerDB?** Embedded, no external process, Go-native, LSM-tree based - ideal for the master's metadata workload (frequent small reads/writes, rare full scans).
+**Why BadgerDB?** An embedded, Go-native LSM store with no external process fits
+the master's metadata workload of frequent small reads and writes.
 
-**Why StatefulSets for chunk servers?** Stable network identity (`chunkserver-0.vaultfs`) means the master's chunk location map survives pod restarts without remapping.
+**Why StatefulSets?** Raft and the chunk map both depend on stable network
+identities. Stable pod names mean a restarted node keeps its place in the cluster
+without remapping.
 
-**Why mTLS everywhere?** In a real distributed system, every node must authenticate every other node. This is non-negotiable for security and models how production systems like Kubernetes itself work.
+**Why mTLS everywhere?** In a real distributed system every node must authenticate
+every other node. Mutual TLS is the same model production systems such as
+Kubernetes itself rely on.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup,
+coding conventions, commit style, and the pull request checklist.
 
 ## License
 
-MIT - see [LICENSE](LICENSE)
+Released under the MIT License. See [LICENSE](LICENSE).
