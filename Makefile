@@ -7,8 +7,10 @@
 test:
 	go test -race ./...
 
+GOLANGCI_LINT ?= $(shell go env GOPATH)/bin/golangci-lint
+
 lint:
-	golangci-lint run ./...
+	$(GOLANGCI_LINT) run ./...
 
 build:
 	@mkdir -p bin

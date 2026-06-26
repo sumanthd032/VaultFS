@@ -1,32 +1,37 @@
+version: "2"
+
 run:
   timeout: 5m
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - govet
     - staticcheck
     - gosec
-
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-    check-blank: false
-  govet:
-    enable-all: false
-  staticcheck:
-    checks:
-      - "all"
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+    govet:
+      enable-all: false
+    staticcheck:
+      checks:
+        - "all"
 
 issues:
   exclude-rules:
-    # G304: WAL and chunk servers intentionally open files via variable paths.
-    # Paths are always constructed with filepath.Join + filepath.Clean.
+    # WAL and chunk servers intentionally open files via variable paths
+    # (always filepath.Join + filepath.Clean constructed).
     - linters:
         - gosec
       text: "G304:"
+    # Path traversal false-positives in tests that use t.TempDir() paths.
+    - linters:
+        - gosec
+      text: "G703:"
     # Test files are exempt from gosec (no production security risk).
-    - path: "_test\\.go"
+    - path: ".*_test\\.go"
       linters:
         - gosec

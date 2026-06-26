@@ -264,7 +264,7 @@ func TestWALCRCCorruption(t *testing.T) {
 	}
 	data[entry1Size+8] ^= 0xFF // flip CRC byte of entry 2
 
-	if err := os.WriteFile(segs[0], data, 0600); err != nil {
+	if err := os.WriteFile(segs[0], data, 0600); err != nil { //nolint:gosec // segs[0] is a t.TempDir() path
 		t.Fatal(err)
 	}
 
