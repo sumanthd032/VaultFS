@@ -5,6 +5,10 @@ bin/
 *.dll
 *.so
 *.dylib
+# Binaries built at the repo root by `go build ./cmd/...`
+/master
+/chunkserver
+/vaultfs
 
 # Test binary and coverage
 *.test
