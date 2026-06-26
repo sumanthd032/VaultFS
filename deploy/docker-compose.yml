@@ -1,0 +1,134 @@
+# Full local VaultFS cluster: three Raft masters, three chunk servers, and the
+# Prometheus + Grafana observability stack. Every VaultFS service speaks mutual
+# TLS using the certificates in ./certs (run `make certs` first).
+#
+# Bring it up from the repo root with: make dev
+# The CLI reaches the cluster on localhost:9000 (master-0).
+
+name: vaultfs
+
+x-master-env: &master-env
+  VAULTFS_LISTEN: ":9000"
+  VAULTFS_RAFT_LISTEN: ":9200"
+  VAULTFS_CHUNKSERVERS: "chunkserver-0@chunkserver-0:9100,chunkserver-1@chunkserver-1:9100,chunkserver-2@chunkserver-2:9100"
+  VAULTFS_DATA_DIR: /var/lib/vaultfs/meta
+  VAULTFS_CERT: /etc/vaultfs/certs/master.crt
+  VAULTFS_KEY: /etc/vaultfs/certs/master.key
+  VAULTFS_CA: /etc/vaultfs/certs/ca.crt
+
+x-chunk-env: &chunk-env
+  VAULTFS_LISTEN: ":9100"
+  VAULTFS_DATA_DIR: /var/lib/vaultfs/chunks
+  VAULTFS_CERT: /etc/vaultfs/certs/chunkserver.crt
+  VAULTFS_KEY: /etc/vaultfs/certs/chunkserver.key
+  VAULTFS_CA: /etc/vaultfs/certs/ca.crt
+
+services:
+  master-0:
+    build:
+      context: ..
+      dockerfile: cmd/master/Dockerfile
+    environment:
+      <<: *master-env
+      VAULTFS_NODE_ID: master-0
+      VAULTFS_RAFT_PEERS: "master-1:9200,master-2:9200"
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - master-0-data:/var/lib/vaultfs/meta
+    networks: [vaultfs]
+
+  master-1:
+    build:
+      context: ..
+      dockerfile: cmd/master/Dockerfile
+    environment:
+      <<: *master-env
+      VAULTFS_NODE_ID: master-1
+      VAULTFS_RAFT_PEERS: "master-0:9200,master-2:9200"
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - master-1-data:/var/lib/vaultfs/meta
+    networks: [vaultfs]
+
+  master-2:
+    build:
+      context: ..
+      dockerfile: cmd/master/Dockerfile
+    environment:
+      <<: *master-env
+      VAULTFS_NODE_ID: master-2
+      VAULTFS_RAFT_PEERS: "master-0:9200,master-1:9200"
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - master-2-data:/var/lib/vaultfs/meta
+    networks: [vaultfs]
+
+  chunkserver-0:
+    build:
+      context: ..
+      dockerfile: cmd/chunkserver/Dockerfile
+    environment:
+      <<: *chunk-env
+      VAULTFS_NODE_ID: chunkserver-0
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - chunkserver-0-data:/var/lib/vaultfs/chunks
+    networks: [vaultfs]
+
+  chunkserver-1:
+    build:
+      context: ..
+      dockerfile: cmd/chunkserver/Dockerfile
+    environment:
+      <<: *chunk-env
+      VAULTFS_NODE_ID: chunkserver-1
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - chunkserver-1-data:/var/lib/vaultfs/chunks
+    networks: [vaultfs]
+
+  chunkserver-2:
+    build:
+      context: ..
+      dockerfile: cmd/chunkserver/Dockerfile
+    environment:
+      <<: *chunk-env
+      VAULTFS_NODE_ID: chunkserver-2
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - chunkserver-2-data:/var/lib/vaultfs/chunks
+    networks: [vaultfs]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [vaultfs]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+    networks: [vaultfs]
+
+volumes:
+  master-0-data:
+  master-1-data:
+  master-2-data:
+  chunkserver-0-data:
+  chunkserver-1-data:
+  chunkserver-2-data:
+
+networks:
+  vaultfs:
+    driver: bridge

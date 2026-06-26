@@ -1,0 +1,28 @@
+# Prometheus scrape configuration for the VaultFS cluster.
+#
+# Each VaultFS process exposes Prometheus metrics on an HTTP /metrics endpoint
+# (wired in Step 6). Masters serve metrics on :9001 and chunk servers on :9101,
+# alongside their gRPC ports. Until Step 6 lands these targets show as down.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: vaultfs-masters
+    static_configs:
+      - targets:
+          - master-0:9001
+          - master-1:9001
+          - master-2:9001
+
+  - job_name: vaultfs-chunkservers
+    static_configs:
+      - targets:
+          - chunkserver-0:9101
+          - chunkserver-1:9101
+          - chunkserver-2:9101
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
