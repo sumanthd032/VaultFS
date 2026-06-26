@@ -101,3 +101,22 @@ func (cm *ChunkMap) ChunkCount() int {
 	defer cm.mu.RUnlock()
 	return len(cm.locations)
 }
+
+// UnderReplicated returns, for every chunk with fewer than factor replicas, a
+// copy of its current locations keyed by chunk ID. Chunks with zero replicas are
+// not tracked by the map (their entries are removed when the last replica is
+// evicted), so every returned chunk has at least one live source to copy from.
+func (cm *ChunkMap) UnderReplicated(factor int) map[string][]Location {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	out := make(map[string][]Location)
+	for id, locs := range cm.locations {
+		if len(locs) < factor {
+			cp := make([]Location, len(locs))
+			copy(cp, locs)
+			out[id] = cp
+		}
+	}
+	return out
+}
