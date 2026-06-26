@@ -1,0 +1,8 @@
+# Dedicated namespace for all VaultFS resources.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vaultfs
+  labels:
+    app.kubernetes.io/name: vaultfs
+    app.kubernetes.io/part-of: vaultfs
