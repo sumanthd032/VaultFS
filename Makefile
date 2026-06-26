@@ -35,8 +35,7 @@ proto:
 # ----------------------------------------------
 
 certs:
-	@which openssl > /dev/null 2>&1 || (echo "openssl not installed" && exit 1)
-	@bash deploy/gen-certs.sh deploy/certs
+	go run ./cmd/gen-certs deploy/certs
 
 # ----------------------------------------------
 # Local cluster via Docker Compose (Step 5)
