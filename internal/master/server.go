@@ -55,11 +55,14 @@ type Server struct {
 	rf         int
 	node       *raft.Node
 	metrics    *metrics.Metrics
+	monitor    *metadata.Monitor
+	chunkMap   *metadata.ChunkMap
 
 	opSeq atomic.Uint64
 
-	mu      sync.Mutex // protects waiters
-	waiters map[string]chan error
+	mu          sync.Mutex // protects waiters and chunkCounts
+	waiters     map[string]chan error
+	chunkCounts map[string]int64 // node ID -> chunks reported in its last heartbeat
 }
 
 // Option configures a Server.
@@ -70,6 +73,18 @@ func WithMetrics(m *metrics.Metrics) Option {
 	return func(s *Server) { s.metrics = m }
 }
 
+// WithMonitor attaches a liveness monitor that records chunk-server heartbeats.
+func WithMonitor(m *metadata.Monitor) Option {
+	return func(s *Server) { s.monitor = m }
+}
+
+// WithChunkMap attaches a chunk map that the master populates as writes commit,
+// so the liveness monitor can detect under-replicated chunks. It must be the
+// same instance passed to the monitor.
+func WithChunkMap(cm *metadata.ChunkMap) Option {
+	return func(s *Server) { s.chunkMap = cm }
+}
+
 // New creates a master Server. node is a started Raft node whose committed
 // entries arrive on commitCh; the caller wires those together. chunkNodes is the
 // set of chunk servers available for placement and rf is the replication factor.
@@ -78,12 +93,13 @@ func New(ns *metadata.Namespace, leases *metadata.LeaseManager, node *raft.Node,
 		rf = metadata.DefaultReplicationFactor
 	}
 	s := &Server{
-		ns:         ns,
-		leases:     leases,
-		chunkNodes: chunkNodes,
-		rf:         rf,
-		node:       node,
-		waiters:    make(map[string]chan error),
+		ns:          ns,
+		leases:      leases,
+		chunkNodes:  chunkNodes,
+		rf:          rf,
+		node:        node,
+		waiters:     make(map[string]chan error),
+		chunkCounts: make(map[string]int64),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -128,12 +144,19 @@ func (s *Server) apply(cmd command) error {
 	case opFinalize:
 		fi := metadata.FileInfo{Path: cmd.Path, Size: cmd.Size, ChunkIDs: cmd.ChunkIDs}
 		if _, err := s.ns.Stat(cmd.Path); err == nil {
-			return s.ns.UpdateFile(fi)
+			if err := s.ns.UpdateFile(fi); err != nil {
+				return err
+			}
+		} else {
+			if err := s.ensureParents(cmd.Path); err != nil {
+				return err
+			}
+			if err := s.ns.CreateFile(fi); err != nil {
+				return err
+			}
 		}
-		if err := s.ensureParents(cmd.Path); err != nil {
-			return err
-		}
-		return s.ns.CreateFile(fi)
+		s.recordChunkLocations(cmd.ChunkIDs)
+		return nil
 	case opDelete:
 		if err := s.ns.DeleteFile(cmd.Path); err != nil && !errors.Is(err, metadata.ErrNotFound) {
 			return err
@@ -141,6 +164,22 @@ func (s *Server) apply(cmd command) error {
 		return nil
 	default:
 		return fmt.Errorf("master: unknown op kind %d", cmd.Kind)
+	}
+}
+
+// recordChunkLocations registers the deterministic placement of each chunk in
+// the chunk map so the liveness monitor can detect under-replicated chunks
+// after a node failure. Placement matches what the client used (the first rf
+// nodes), and AddLocation is idempotent, so replays are safe.
+func (s *Server) recordChunkLocations(chunkIDs []string) {
+	if s.chunkMap == nil {
+		return
+	}
+	placement := s.placement()
+	for _, id := range chunkIDs {
+		for _, n := range placement {
+			s.chunkMap.AddLocation(id, metadata.Location{NodeID: n.GetNodeId(), Address: n.GetAddress()})
+		}
 	}
 }
 
@@ -325,29 +364,76 @@ func (s *Server) GetLease(_ context.Context, req *vaultfsv1.GetLeaseRequest) (*v
 	}}, nil
 }
 
-// -- AdminService -------------------------------------------------------------
+// Heartbeat records a chunk server's liveness and reported chunk inventory. It
+// is called periodically by every chunk server.
+func (s *Server) Heartbeat(_ context.Context, req *vaultfsv1.HeartbeatRequest) (*vaultfsv1.HeartbeatResponse, error) {
+	id := req.GetNodeId()
+	if id == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+	if s.monitor != nil {
+		s.monitor.RecordHeartbeat(id)
+	}
+	s.mu.Lock()
+	s.chunkCounts[id] = req.GetChunkCount()
+	s.mu.Unlock()
+	return &vaultfsv1.HeartbeatResponse{}, nil
+}
 
-// ClusterStatus reports Raft leadership and the known chunk servers.
-func (s *Server) ClusterStatus(_ context.Context, _ *vaultfsv1.ClusterStatusRequest) (*vaultfsv1.ClusterStatusResponse, error) {
+// nodeStatuses builds the per-node status list, enriching each known chunk
+// server with its last reported chunk count and, when a monitor is configured,
+// its liveness and most recent heartbeat time. Without a monitor every node is
+// reported alive so single-node and test setups behave as before.
+func (s *Server) nodeStatuses() []*vaultfsv1.NodeStatus {
+	s.mu.Lock()
+	counts := make(map[string]int64, len(s.chunkCounts))
+	for id, c := range s.chunkCounts {
+		counts[id] = c
+	}
+	s.mu.Unlock()
+
 	nodes := make([]*vaultfsv1.NodeStatus, len(s.chunkNodes))
 	for i, n := range s.chunkNodes {
-		nodes[i] = &vaultfsv1.NodeStatus{Node: n, State: vaultfsv1.NodeState_NODE_STATE_ALIVE}
+		st := &vaultfsv1.NodeStatus{
+			Node:       n,
+			State:      vaultfsv1.NodeState_NODE_STATE_ALIVE,
+			ChunkCount: counts[n.GetNodeId()],
+		}
+		if s.monitor != nil {
+			st.State = vaultfsv1.NodeState_NODE_STATE_DEAD
+			if ts, ok := s.monitor.LastSeen(n.GetNodeId()); ok {
+				st.LastHeartbeatUnix = ts.Unix()
+			}
+			if s.monitor.IsAlive(n.GetNodeId()) {
+				st.State = vaultfsv1.NodeState_NODE_STATE_ALIVE
+			}
+		}
+		nodes[i] = st
+	}
+	return nodes
+}
+
+// -- AdminService -------------------------------------------------------------
+
+// ClusterStatus reports Raft leadership, namespace totals, and the known chunk
+// servers with their liveness and chunk counts.
+func (s *Server) ClusterStatus(_ context.Context, _ *vaultfsv1.ClusterStatusRequest) (*vaultfsv1.ClusterStatusResponse, error) {
+	fileCount, chunkCount, err := s.ns.Stats()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "namespace stats: %v", err)
 	}
 	return &vaultfsv1.ClusterStatusResponse{
 		LeaderId:   s.node.LeaderID(),
 		Term:       s.node.Term(),
-		ChunkCount: int64(len(s.chunkNodes)),
-		Nodes:      nodes,
+		FileCount:  int64(fileCount),
+		ChunkCount: int64(chunkCount),
+		Nodes:      s.nodeStatuses(),
 	}, nil
 }
 
-// ListNodes returns the known chunk servers.
+// ListNodes returns the known chunk servers with their liveness and chunk counts.
 func (s *Server) ListNodes(_ context.Context, _ *vaultfsv1.ListNodesRequest) (*vaultfsv1.ListNodesResponse, error) {
-	nodes := make([]*vaultfsv1.NodeStatus, len(s.chunkNodes))
-	for i, n := range s.chunkNodes {
-		nodes[i] = &vaultfsv1.NodeStatus{Node: n, State: vaultfsv1.NodeState_NODE_STATE_ALIVE}
-	}
-	return &vaultfsv1.ListNodesResponse{Nodes: nodes}, nil
+	return &vaultfsv1.ListNodesResponse{Nodes: s.nodeStatuses()}, nil
 }
 
 // -- helpers ------------------------------------------------------------------

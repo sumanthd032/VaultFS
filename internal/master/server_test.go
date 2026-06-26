@@ -22,7 +22,7 @@ func testChunkNodes() []*vaultfsv1.NodeInfo {
 }
 
 // newTestMaster builds a single-node Raft master that elects itself leader.
-func newTestMaster(t *testing.T) *Server {
+func newTestMaster(t *testing.T, opts ...Option) *Server {
 	t.Helper()
 	store, err := metadata.Open(t.TempDir())
 	if err != nil {
@@ -43,7 +43,7 @@ func newTestMaster(t *testing.T) *Server {
 	net := raft.NewInMemNetwork()
 	node.Start(net.Transport("m0"))
 
-	srv := New(ns, leases, node, testChunkNodes(), 3)
+	srv := New(ns, leases, node, testChunkNodes(), 3, opts...)
 	ctx, cancel := context.WithCancel(context.Background())
 	go srv.Run(ctx, commitCh)
 
@@ -191,7 +191,84 @@ func TestClusterStatus(t *testing.T) {
 	if resp.GetLeaderId() != "m0" {
 		t.Errorf("leader = %q, want m0", resp.GetLeaderId())
 	}
-	if resp.GetChunkCount() != 3 {
-		t.Errorf("chunk count = %d, want 3", resp.GetChunkCount())
+	if len(resp.GetNodes()) != 3 {
+		t.Errorf("nodes = %d, want 3", len(resp.GetNodes()))
+	}
+	// A fresh namespace holds no files or chunks.
+	if resp.GetFileCount() != 0 || resp.GetChunkCount() != 0 {
+		t.Errorf("file=%d chunk=%d, want 0/0", resp.GetFileCount(), resp.GetChunkCount())
+	}
+}
+
+// TestClusterStatusCountsFilesAndChunks verifies the top-line counts come from
+// the namespace: writing a two-chunk file makes them report 1 file, 2 chunks.
+func TestClusterStatusCountsFilesAndChunks(t *testing.T) {
+	s := newTestMaster(t)
+	ctx := context.Background()
+	if _, err := s.FinalizeWrite(ctx, &vaultfsv1.FinalizeWriteRequest{
+		Path: "/a.bin", ChunkIds: []string{"chunk-a", "chunk-b"}, Size: 100,
+	}); err != nil {
+		t.Fatalf("FinalizeWrite: %v", err)
+	}
+	resp, err := s.ClusterStatus(ctx, &vaultfsv1.ClusterStatusRequest{})
+	if err != nil {
+		t.Fatalf("ClusterStatus: %v", err)
+	}
+	if resp.GetFileCount() != 1 {
+		t.Errorf("file count = %d, want 1", resp.GetFileCount())
+	}
+	if resp.GetChunkCount() != 2 {
+		t.Errorf("chunk count = %d, want 2", resp.GetChunkCount())
+	}
+}
+
+// TestHeartbeatUpdatesNodeStatus verifies that a chunk server's heartbeat sets
+// its reported chunk count, marks it alive, and records a heartbeat time.
+func TestHeartbeatUpdatesNodeStatus(t *testing.T) {
+	monitor := metadata.NewMonitor(metadata.NewChunkMap(), 0, 3)
+	s := newTestMaster(t, WithMonitor(monitor), WithChunkMap(metadata.NewChunkMap()))
+	ctx := context.Background()
+
+	// Before any heartbeat the node is dead with no heartbeat time.
+	before, err := s.ClusterStatus(ctx, &vaultfsv1.ClusterStatusRequest{})
+	if err != nil {
+		t.Fatalf("ClusterStatus: %v", err)
+	}
+	if before.GetNodes()[0].GetState() != vaultfsv1.NodeState_NODE_STATE_DEAD {
+		t.Errorf("node state = %v, want DEAD before heartbeat", before.GetNodes()[0].GetState())
+	}
+
+	if _, err := s.Heartbeat(ctx, &vaultfsv1.HeartbeatRequest{NodeId: "cs-0", ChunkCount: 7}); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+
+	after, err := s.ClusterStatus(ctx, &vaultfsv1.ClusterStatusRequest{})
+	if err != nil {
+		t.Fatalf("ClusterStatus: %v", err)
+	}
+	var cs0 *vaultfsv1.NodeStatus
+	for _, n := range after.GetNodes() {
+		if n.GetNode().GetNodeId() == "cs-0" {
+			cs0 = n
+		}
+	}
+	if cs0 == nil {
+		t.Fatal("cs-0 not in status")
+	}
+	if cs0.GetState() != vaultfsv1.NodeState_NODE_STATE_ALIVE {
+		t.Errorf("state = %v, want ALIVE", cs0.GetState())
+	}
+	if cs0.GetChunkCount() != 7 {
+		t.Errorf("chunk count = %d, want 7", cs0.GetChunkCount())
+	}
+	if cs0.GetLastHeartbeatUnix() == 0 {
+		t.Error("last heartbeat not recorded")
+	}
+}
+
+func TestHeartbeatRejectsEmptyNodeID(t *testing.T) {
+	s := newTestMaster(t)
+	if _, err := s.Heartbeat(context.Background(), &vaultfsv1.HeartbeatRequest{}); err == nil {
+		t.Fatal("expected error for empty node_id")
 	}
 }

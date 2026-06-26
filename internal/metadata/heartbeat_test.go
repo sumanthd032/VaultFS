@@ -97,3 +97,31 @@ func TestMonitorDefaults(t *testing.T) {
 		t.Errorf("factor = %d, want default", m.replicationFactor)
 	}
 }
+
+func TestMonitorLastSeenAndIsAlive(t *testing.T) {
+	cm := NewChunkMap()
+	m := NewMonitor(cm, 15*time.Second, 3)
+	base := time.Now()
+	m.now = func() time.Time { return base }
+
+	if _, ok := m.LastSeen("n1"); ok {
+		t.Error("LastSeen should be absent before any heartbeat")
+	}
+	if m.IsAlive("n1") {
+		t.Error("IsAlive should be false before any heartbeat")
+	}
+
+	m.RecordHeartbeat("n1")
+	if ts, ok := m.LastSeen("n1"); !ok || !ts.Equal(base) {
+		t.Errorf("LastSeen = %v, %v; want %v, true", ts, ok, base)
+	}
+	if !m.IsAlive("n1") {
+		t.Error("IsAlive should be true right after a heartbeat")
+	}
+
+	// Past the dead timeout it is no longer alive.
+	m.now = func() time.Time { return base.Add(20 * time.Second) }
+	if m.IsAlive("n1") {
+		t.Error("IsAlive should be false after the timeout")
+	}
+}

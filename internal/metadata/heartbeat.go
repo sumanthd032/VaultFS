@@ -65,6 +65,23 @@ func (m *Monitor) RecordHeartbeat(nodeID string) {
 	m.lastSeen[nodeID] = m.now()
 }
 
+// LastSeen returns the time of nodeID's most recent heartbeat and whether any
+// heartbeat has been recorded for it.
+func (m *Monitor) LastSeen(nodeID string) (time.Time, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ts, ok := m.lastSeen[nodeID]
+	return ts, ok
+}
+
+// IsAlive reports whether nodeID has heartbeated within the dead timeout.
+func (m *Monitor) IsAlive(nodeID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ts, ok := m.lastSeen[nodeID]
+	return ok && m.now().Sub(ts) <= m.timeout
+}
+
 // LiveNodes returns the node IDs that have heartbeated within the timeout.
 func (m *Monitor) LiveNodes() []string {
 	m.mu.Lock()

@@ -353,3 +353,27 @@ func TestChunkVersionMerge(t *testing.T) {
 		t.Error("merged version should dominate both parents")
 	}
 }
+
+func TestNamespaceStats(t *testing.T) {
+	ns := openTestNamespace(t)
+	if err := ns.CreateDir("/d"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ns.CreateFile(FileInfo{Path: "/d/a", ChunkIDs: []string{"c1", "c2"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ns.CreateFile(FileInfo{Path: "/d/b", ChunkIDs: []string{"c2", "c3"}}); err != nil {
+		t.Fatal(err)
+	}
+	files, chunks, err := ns.Stats()
+	if err != nil {
+		t.Fatalf("Stats: %v", err)
+	}
+	if files != 2 {
+		t.Errorf("files = %d, want 2 (directories excluded)", files)
+	}
+	// Distinct chunks across both files: c1, c2, c3.
+	if chunks != 3 {
+		t.Errorf("chunks = %d, want 3 distinct", chunks)
+	}
+}

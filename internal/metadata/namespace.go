@@ -136,6 +136,27 @@ func (ns *Namespace) ListDir(dir string) ([]FileInfo, error) {
 	return results, err
 }
 
+// Stats walks the whole namespace and returns the number of files (excluding
+// directories) and the number of distinct chunks they reference.
+func (ns *Namespace) Stats() (files int, chunks int, err error) {
+	seen := make(map[string]struct{})
+	err = ns.store.Scan([]byte(nsPrefix), func(_, val []byte) error {
+		var fi FileInfo
+		if err := json.Unmarshal(val, &fi); err != nil {
+			return fmt.Errorf("metadata: namespace stats unmarshal: %w", err)
+		}
+		if fi.IsDir {
+			return nil
+		}
+		files++
+		for _, id := range fi.ChunkIDs {
+			seen[id] = struct{}{}
+		}
+		return nil
+	})
+	return files, len(seen), err
+}
+
 // Rename moves the file or directory at from to to atomically.
 func (ns *Namespace) Rename(from, to string) error {
 	fi, err := ns.Stat(from)
