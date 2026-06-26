@@ -19,17 +19,19 @@ import (
 
 	"github.com/sumanthd032/vaultfs/internal/chunk"
 	"github.com/sumanthd032/vaultfs/internal/chunkserver"
+	"github.com/sumanthd032/vaultfs/internal/metrics"
 	"github.com/sumanthd032/vaultfs/internal/security"
 	vaultfsv1 "github.com/sumanthd032/vaultfs/proto/vaultfs/v1"
 )
 
 type config struct {
-	nodeID   string
-	listen   string
-	dataDir  string
-	certFile string
-	keyFile  string
-	caFile   string
+	nodeID      string
+	listen      string
+	dataDir     string
+	metricsAddr string
+	certFile    string
+	keyFile     string
+	caFile      string
 }
 
 // envOr returns the value of env, or def when unset.
@@ -45,6 +47,7 @@ func parseConfig() config {
 	flag.StringVar(&c.nodeID, "node-id", envOr("VAULTFS_NODE_ID", "chunkserver-0"), "stable node identifier")
 	flag.StringVar(&c.listen, "listen", envOr("VAULTFS_LISTEN", ":9100"), "gRPC listen address")
 	flag.StringVar(&c.dataDir, "data-dir", envOr("VAULTFS_DATA_DIR", "/var/lib/vaultfs/chunks"), "chunk storage directory")
+	flag.StringVar(&c.metricsAddr, "metrics-addr", envOr("VAULTFS_METRICS_ADDR", ":9101"), "Prometheus metrics HTTP address")
 	flag.StringVar(&c.certFile, "cert", envOr("VAULTFS_CERT", "/etc/vaultfs/certs/chunkserver.crt"), "TLS certificate")
 	flag.StringVar(&c.keyFile, "key", envOr("VAULTFS_KEY", "/etc/vaultfs/certs/chunkserver.key"), "TLS private key")
 	flag.StringVar(&c.caFile, "ca", envOr("VAULTFS_CA", "/etc/vaultfs/certs/ca.crt"), "cluster CA certificate")
@@ -85,7 +88,16 @@ func run(c config) error {
 		return vaultfsv1.NewChunkServiceClient(cc), func() { _ = cc.Close() }, nil
 	}
 
-	srv := chunkserver.New(c.nodeID, store, dial)
+	mx := metrics.New()
+	srv := chunkserver.New(c.nodeID, store, dial, chunkserver.WithMetrics(mx))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		if err := mx.Serve(ctx, c.metricsAddr); err != nil {
+			slog.Error("metrics server stopped", "err", err)
+		}
+	}()
 
 	gs := grpc.NewServer(grpc.Creds(credentials.NewTLS(serverTLS)))
 	vaultfsv1.RegisterChunkServiceServer(gs, srv)

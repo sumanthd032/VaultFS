@@ -22,6 +22,7 @@ import (
 
 	"github.com/sumanthd032/vaultfs/internal/master"
 	"github.com/sumanthd032/vaultfs/internal/metadata"
+	"github.com/sumanthd032/vaultfs/internal/metrics"
 	"github.com/sumanthd032/vaultfs/internal/raft"
 	"github.com/sumanthd032/vaultfs/internal/security"
 	vaultfsv1 "github.com/sumanthd032/vaultfs/proto/vaultfs/v1"
@@ -35,6 +36,7 @@ type config struct {
 	dataDir     string
 	chunkNodes  []*vaultfsv1.NodeInfo
 	replication int
+	metricsAddr string
 	certFile    string
 	keyFile     string
 	caFile      string
@@ -81,6 +83,7 @@ func parseConfig() config {
 	flag.StringVar(&c.dataDir, "data-dir", envOr("VAULTFS_DATA_DIR", "/var/lib/vaultfs/meta"), "metadata directory")
 	flag.StringVar(&chunkServers, "chunkservers", envOr("VAULTFS_CHUNKSERVERS", ""), "comma-separated chunk servers as id@addr")
 	flag.IntVar(&c.replication, "replication", metadata.DefaultReplicationFactor, "replication factor")
+	flag.StringVar(&c.metricsAddr, "metrics-addr", envOr("VAULTFS_METRICS_ADDR", ":9001"), "Prometheus metrics HTTP address")
 	flag.StringVar(&c.certFile, "cert", envOr("VAULTFS_CERT", "/etc/vaultfs/certs/master.crt"), "TLS certificate")
 	flag.StringVar(&c.keyFile, "key", envOr("VAULTFS_KEY", "/etc/vaultfs/certs/master.key"), "TLS private key")
 	flag.StringVar(&c.caFile, "ca", envOr("VAULTFS_CA", "/etc/vaultfs/certs/ca.crt"), "cluster CA certificate")
@@ -117,8 +120,11 @@ func run(c config) error {
 	ns := metadata.NewNamespace(store)
 	leases := metadata.NewLeaseManager(metadata.DefaultLeaseTTL)
 
+	mx := metrics.New()
+
 	commitCh := make(chan raft.Entry, 256)
 	raftCfg := raft.DefaultConfig(c.nodeID, c.raftPeers, commitCh)
+	raftCfg.OnElection = mx.RecordElection
 	node := raft.New(raftCfg)
 
 	transport, err := raft.NewGRPCTransport(c.raftListen,
@@ -130,10 +136,15 @@ func run(c config) error {
 	node.Start(transport)
 	defer node.Stop()
 
-	srv := master.New(ns, leases, node, c.chunkNodes, c.replication)
+	srv := master.New(ns, leases, node, c.chunkNodes, c.replication, master.WithMetrics(mx))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go srv.Run(ctx, commitCh)
+	go func() {
+		if err := mx.Serve(ctx, c.metricsAddr); err != nil {
+			slog.Error("metrics server stopped", "err", err)
+		}
+	}()
 
 	gs := grpc.NewServer(grpc.Creds(credentials.NewTLS(serverTLS)))
 	vaultfsv1.RegisterMasterServiceServer(gs, srv)
