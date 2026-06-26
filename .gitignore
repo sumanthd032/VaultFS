@@ -28,6 +28,7 @@ deploy/certs/
 # Internal planning and build-process notes (local only)
 docs/step-logs/
 docs/BUILD_PLAN.md
+docs/STEP_TEMPLATE.md
 
 # AI instruction file (local use only)
 CLAUDE.md
