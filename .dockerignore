@@ -1,0 +1,7 @@
+# Keep the build context small and free of secrets.
+.git
+bin/
+deploy/certs/
+docs/
+*.md
+.github/
