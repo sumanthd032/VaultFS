@@ -1,13 +1,20 @@
 // Package main is the entry point for the VaultFS CLI.
 //
-// The CLI wraps the public Go SDK (pkg/client) with Cobra commands:
-// put, get, ls, rm, and status. Each command connects to the master
-// cluster, authenticates via mTLS, and delegates to the SDK.
-// Implemented fully in Step 4.
+// It wires the Cobra command tree (defined in the cmd package) which delegates
+// to the public Go SDK (pkg/client). Command logic lives in cmd/; this file
+// only parses arguments and reports the exit status.
 package main
 
-import "log/slog"
+import (
+	"fmt"
+	"os"
+
+	"github.com/sumanthd032/vaultfs/cmd/vaultfs/cmd"
+)
 
 func main() {
-	slog.Info("vaultfs-cli starting")
+	if err := cmd.NewRootCommand().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "vaultfs:", err)
+		os.Exit(1)
+	}
 }
