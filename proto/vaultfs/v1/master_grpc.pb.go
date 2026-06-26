@@ -27,6 +27,7 @@ const (
 	MasterService_OpenForWrite_FullMethodName  = "/vaultfs.v1.MasterService/OpenForWrite"
 	MasterService_FinalizeWrite_FullMethodName = "/vaultfs.v1.MasterService/FinalizeWrite"
 	MasterService_GetLease_FullMethodName      = "/vaultfs.v1.MasterService/GetLease"
+	MasterService_Heartbeat_FullMethodName     = "/vaultfs.v1.MasterService/Heartbeat"
 )
 
 // MasterServiceClient is the client API for MasterService service.
@@ -45,6 +46,9 @@ type MasterServiceClient interface {
 	OpenForWrite(ctx context.Context, in *OpenForWriteRequest, opts ...grpc.CallOption) (*OpenForWriteResponse, error)
 	FinalizeWrite(ctx context.Context, in *FinalizeWriteRequest, opts ...grpc.CallOption) (*FinalizeWriteResponse, error)
 	GetLease(ctx context.Context, in *GetLeaseRequest, opts ...grpc.CallOption) (*GetLeaseResponse, error)
+	// Heartbeat is sent periodically by each chunk server to report liveness and
+	// its current chunk inventory.
+	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
 }
 
 type masterServiceClient struct {
@@ -135,6 +139,16 @@ func (c *masterServiceClient) GetLease(ctx context.Context, in *GetLeaseRequest,
 	return out, nil
 }
 
+func (c *masterServiceClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, MasterService_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MasterServiceServer is the server API for MasterService service.
 // All implementations must embed UnimplementedMasterServiceServer
 // for forward compatibility.
@@ -151,6 +165,9 @@ type MasterServiceServer interface {
 	OpenForWrite(context.Context, *OpenForWriteRequest) (*OpenForWriteResponse, error)
 	FinalizeWrite(context.Context, *FinalizeWriteRequest) (*FinalizeWriteResponse, error)
 	GetLease(context.Context, *GetLeaseRequest) (*GetLeaseResponse, error)
+	// Heartbeat is sent periodically by each chunk server to report liveness and
+	// its current chunk inventory.
+	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
 	mustEmbedUnimplementedMasterServiceServer()
 }
 
@@ -184,6 +201,9 @@ func (UnimplementedMasterServiceServer) FinalizeWrite(context.Context, *Finalize
 }
 func (UnimplementedMasterServiceServer) GetLease(context.Context, *GetLeaseRequest) (*GetLeaseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLease not implemented")
+}
+func (UnimplementedMasterServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Heartbeat not implemented")
 }
 func (UnimplementedMasterServiceServer) mustEmbedUnimplementedMasterServiceServer() {}
 func (UnimplementedMasterServiceServer) testEmbeddedByValue()                       {}
@@ -350,6 +370,24 @@ func _MasterService_GetLease_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MasterService_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterServiceServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MasterService_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterServiceServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MasterService_ServiceDesc is the grpc.ServiceDesc for MasterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -388,6 +426,10 @@ var MasterService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLease",
 			Handler:    _MasterService_GetLease_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _MasterService_Heartbeat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

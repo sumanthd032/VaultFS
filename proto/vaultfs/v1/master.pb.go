@@ -761,6 +761,103 @@ func (x *GetLeaseResponse) GetLease() *Lease {
 	return nil
 }
 
+type HeartbeatRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	NodeId  string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Address string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	// chunk_count is the number of chunks the sender currently stores.
+	ChunkCount    int64 `protobuf:"varint,3,opt,name=chunk_count,json=chunkCount,proto3" json:"chunk_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatRequest) Reset() {
+	*x = HeartbeatRequest{}
+	mi := &file_vaultfs_v1_master_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatRequest) ProtoMessage() {}
+
+func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vaultfs_v1_master_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
+func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
+	return file_vaultfs_v1_master_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *HeartbeatRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *HeartbeatRequest) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *HeartbeatRequest) GetChunkCount() int64 {
+	if x != nil {
+		return x.ChunkCount
+	}
+	return 0
+}
+
+type HeartbeatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatResponse) Reset() {
+	*x = HeartbeatResponse{}
+	mi := &file_vaultfs_v1_master_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatResponse) ProtoMessage() {}
+
+func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vaultfs_v1_master_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
+func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
+	return file_vaultfs_v1_master_proto_rawDescGZIP(), []int{17}
+}
+
 var File_vaultfs_v1_master_proto protoreflect.FileDescriptor
 
 const file_vaultfs_v1_master_proto_rawDesc = "" +
@@ -804,7 +901,13 @@ const file_vaultfs_v1_master_proto_rawDesc = "" +
 	"\bchunk_id\x18\x01 \x01(\tR\achunkId\x12\x16\n" +
 	"\x06holder\x18\x02 \x01(\tR\x06holder\";\n" +
 	"\x10GetLeaseResponse\x12'\n" +
-	"\x05lease\x18\x01 \x01(\v2\x11.vaultfs.v1.LeaseR\x05lease2\xe8\x04\n" +
+	"\x05lease\x18\x01 \x01(\v2\x11.vaultfs.v1.LeaseR\x05lease\"f\n" +
+	"\x10HeartbeatRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x18\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x1f\n" +
+	"\vchunk_count\x18\x03 \x01(\x03R\n" +
+	"chunkCount\"\x13\n" +
+	"\x11HeartbeatResponse2\xb2\x05\n" +
 	"\rMasterService\x12K\n" +
 	"\n" +
 	"CreateFile\x12\x1d.vaultfs.v1.CreateFileRequest\x1a\x1e.vaultfs.v1.CreateFileResponse\x12K\n" +
@@ -815,7 +918,8 @@ const file_vaultfs_v1_master_proto_rawDesc = "" +
 	"\vOpenForRead\x12\x1e.vaultfs.v1.OpenForReadRequest\x1a\x1f.vaultfs.v1.OpenForReadResponse\x12Q\n" +
 	"\fOpenForWrite\x12\x1f.vaultfs.v1.OpenForWriteRequest\x1a .vaultfs.v1.OpenForWriteResponse\x12T\n" +
 	"\rFinalizeWrite\x12 .vaultfs.v1.FinalizeWriteRequest\x1a!.vaultfs.v1.FinalizeWriteResponse\x12E\n" +
-	"\bGetLease\x12\x1b.vaultfs.v1.GetLeaseRequest\x1a\x1c.vaultfs.v1.GetLeaseResponseB\xa1\x01\n" +
+	"\bGetLease\x12\x1b.vaultfs.v1.GetLeaseRequest\x1a\x1c.vaultfs.v1.GetLeaseResponse\x12H\n" +
+	"\tHeartbeat\x12\x1c.vaultfs.v1.HeartbeatRequest\x1a\x1d.vaultfs.v1.HeartbeatResponseB\xa1\x01\n" +
 	"\x0ecom.vaultfs.v1B\vMasterProtoP\x01Z9github.com/sumanthd032/vaultfs/proto/vaultfs/v1;vaultfsv1\xa2\x02\x03VXX\xaa\x02\n" +
 	"Vaultfs.V1\xca\x02\n" +
 	"Vaultfs\\V1\xe2\x02\x16Vaultfs\\V1\\GPBMetadata\xea\x02\vVaultfs::V1b\x06proto3"
@@ -832,7 +936,7 @@ func file_vaultfs_v1_master_proto_rawDescGZIP() []byte {
 	return file_vaultfs_v1_master_proto_rawDescData
 }
 
-var file_vaultfs_v1_master_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_vaultfs_v1_master_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_vaultfs_v1_master_proto_goTypes = []any{
 	(*CreateFileRequest)(nil),     // 0: vaultfs.v1.CreateFileRequest
 	(*CreateFileResponse)(nil),    // 1: vaultfs.v1.CreateFileResponse
@@ -850,19 +954,21 @@ var file_vaultfs_v1_master_proto_goTypes = []any{
 	(*FinalizeWriteResponse)(nil), // 13: vaultfs.v1.FinalizeWriteResponse
 	(*GetLeaseRequest)(nil),       // 14: vaultfs.v1.GetLeaseRequest
 	(*GetLeaseResponse)(nil),      // 15: vaultfs.v1.GetLeaseResponse
-	(*FileInfo)(nil),              // 16: vaultfs.v1.FileInfo
-	(*ChunkLocation)(nil),         // 17: vaultfs.v1.ChunkLocation
-	(*Lease)(nil),                 // 18: vaultfs.v1.Lease
+	(*HeartbeatRequest)(nil),      // 16: vaultfs.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),     // 17: vaultfs.v1.HeartbeatResponse
+	(*FileInfo)(nil),              // 18: vaultfs.v1.FileInfo
+	(*ChunkLocation)(nil),         // 19: vaultfs.v1.ChunkLocation
+	(*Lease)(nil),                 // 20: vaultfs.v1.Lease
 }
 var file_vaultfs_v1_master_proto_depIdxs = []int32{
-	16, // 0: vaultfs.v1.CreateFileResponse.file:type_name -> vaultfs.v1.FileInfo
-	16, // 1: vaultfs.v1.StatResponse.file:type_name -> vaultfs.v1.FileInfo
-	16, // 2: vaultfs.v1.ListDirResponse.entries:type_name -> vaultfs.v1.FileInfo
-	16, // 3: vaultfs.v1.OpenForReadResponse.file:type_name -> vaultfs.v1.FileInfo
-	17, // 4: vaultfs.v1.OpenForReadResponse.locations:type_name -> vaultfs.v1.ChunkLocation
-	17, // 5: vaultfs.v1.OpenForWriteResponse.placements:type_name -> vaultfs.v1.ChunkLocation
-	16, // 6: vaultfs.v1.FinalizeWriteResponse.file:type_name -> vaultfs.v1.FileInfo
-	18, // 7: vaultfs.v1.GetLeaseResponse.lease:type_name -> vaultfs.v1.Lease
+	18, // 0: vaultfs.v1.CreateFileResponse.file:type_name -> vaultfs.v1.FileInfo
+	18, // 1: vaultfs.v1.StatResponse.file:type_name -> vaultfs.v1.FileInfo
+	18, // 2: vaultfs.v1.ListDirResponse.entries:type_name -> vaultfs.v1.FileInfo
+	18, // 3: vaultfs.v1.OpenForReadResponse.file:type_name -> vaultfs.v1.FileInfo
+	19, // 4: vaultfs.v1.OpenForReadResponse.locations:type_name -> vaultfs.v1.ChunkLocation
+	19, // 5: vaultfs.v1.OpenForWriteResponse.placements:type_name -> vaultfs.v1.ChunkLocation
+	18, // 6: vaultfs.v1.FinalizeWriteResponse.file:type_name -> vaultfs.v1.FileInfo
+	20, // 7: vaultfs.v1.GetLeaseResponse.lease:type_name -> vaultfs.v1.Lease
 	0,  // 8: vaultfs.v1.MasterService.CreateFile:input_type -> vaultfs.v1.CreateFileRequest
 	2,  // 9: vaultfs.v1.MasterService.DeleteFile:input_type -> vaultfs.v1.DeleteFileRequest
 	4,  // 10: vaultfs.v1.MasterService.Stat:input_type -> vaultfs.v1.StatRequest
@@ -871,16 +977,18 @@ var file_vaultfs_v1_master_proto_depIdxs = []int32{
 	10, // 13: vaultfs.v1.MasterService.OpenForWrite:input_type -> vaultfs.v1.OpenForWriteRequest
 	12, // 14: vaultfs.v1.MasterService.FinalizeWrite:input_type -> vaultfs.v1.FinalizeWriteRequest
 	14, // 15: vaultfs.v1.MasterService.GetLease:input_type -> vaultfs.v1.GetLeaseRequest
-	1,  // 16: vaultfs.v1.MasterService.CreateFile:output_type -> vaultfs.v1.CreateFileResponse
-	3,  // 17: vaultfs.v1.MasterService.DeleteFile:output_type -> vaultfs.v1.DeleteFileResponse
-	5,  // 18: vaultfs.v1.MasterService.Stat:output_type -> vaultfs.v1.StatResponse
-	7,  // 19: vaultfs.v1.MasterService.ListDir:output_type -> vaultfs.v1.ListDirResponse
-	9,  // 20: vaultfs.v1.MasterService.OpenForRead:output_type -> vaultfs.v1.OpenForReadResponse
-	11, // 21: vaultfs.v1.MasterService.OpenForWrite:output_type -> vaultfs.v1.OpenForWriteResponse
-	13, // 22: vaultfs.v1.MasterService.FinalizeWrite:output_type -> vaultfs.v1.FinalizeWriteResponse
-	15, // 23: vaultfs.v1.MasterService.GetLease:output_type -> vaultfs.v1.GetLeaseResponse
-	16, // [16:24] is the sub-list for method output_type
-	8,  // [8:16] is the sub-list for method input_type
+	16, // 16: vaultfs.v1.MasterService.Heartbeat:input_type -> vaultfs.v1.HeartbeatRequest
+	1,  // 17: vaultfs.v1.MasterService.CreateFile:output_type -> vaultfs.v1.CreateFileResponse
+	3,  // 18: vaultfs.v1.MasterService.DeleteFile:output_type -> vaultfs.v1.DeleteFileResponse
+	5,  // 19: vaultfs.v1.MasterService.Stat:output_type -> vaultfs.v1.StatResponse
+	7,  // 20: vaultfs.v1.MasterService.ListDir:output_type -> vaultfs.v1.ListDirResponse
+	9,  // 21: vaultfs.v1.MasterService.OpenForRead:output_type -> vaultfs.v1.OpenForReadResponse
+	11, // 22: vaultfs.v1.MasterService.OpenForWrite:output_type -> vaultfs.v1.OpenForWriteResponse
+	13, // 23: vaultfs.v1.MasterService.FinalizeWrite:output_type -> vaultfs.v1.FinalizeWriteResponse
+	15, // 24: vaultfs.v1.MasterService.GetLease:output_type -> vaultfs.v1.GetLeaseResponse
+	17, // 25: vaultfs.v1.MasterService.Heartbeat:output_type -> vaultfs.v1.HeartbeatResponse
+	17, // [17:26] is the sub-list for method output_type
+	8,  // [8:17] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -898,7 +1006,7 @@ func file_vaultfs_v1_master_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vaultfs_v1_master_proto_rawDesc), len(file_vaultfs_v1_master_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

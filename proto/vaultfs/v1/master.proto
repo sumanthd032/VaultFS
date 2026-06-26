@@ -16,6 +16,9 @@ service MasterService {
   rpc OpenForWrite(OpenForWriteRequest) returns (OpenForWriteResponse);
   rpc FinalizeWrite(FinalizeWriteRequest) returns (FinalizeWriteResponse);
   rpc GetLease(GetLeaseRequest) returns (GetLeaseResponse);
+  // Heartbeat is sent periodically by each chunk server to report liveness and
+  // its current chunk inventory.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 }
 
 message CreateFileRequest {
@@ -80,3 +83,11 @@ message GetLeaseRequest {
 message GetLeaseResponse {
   Lease lease = 1;
 }
+
+message HeartbeatRequest {
+  string node_id = 1;
+  string address = 2;
+  // chunk_count is the number of chunks the sender currently stores.
+  int64 chunk_count = 3;
+}
+message HeartbeatResponse {}
