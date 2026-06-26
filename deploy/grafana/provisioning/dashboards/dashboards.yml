@@ -1,5 +1,5 @@
 # Load any dashboard JSON dropped into the dashboards directory. The VaultFS
-# operational dashboard is added in Step 6.
+# operational dashboard ships as vaultfs.json alongside this file.
 apiVersion: 1
 
 providers:
