@@ -122,6 +122,30 @@ services:
     depends_on: [prometheus]
     networks: [vaultfs]
 
+  # On-demand client that runs inside the cluster network, the same way an
+  # application reaches VaultFS in production (a pod on the cluster, not a host
+  # exposing every storage node). It is not started by `make dev`; invoke it
+  # with: docker compose run --rm cli put /work/README.md /docs/readme.md
+  # The repository root is mounted at /work so local files are reachable.
+  cli:
+    profiles: [tools]
+    build:
+      context: ..
+      dockerfile: cmd/vaultfs/Dockerfile
+    # Run as the host user so files written by `get` are not root-owned.
+    # Override for a different uid: VAULTFS_UID=$(id -u) VAULTFS_GID=$(id -g).
+    user: "${VAULTFS_UID:-1000}:${VAULTFS_GID:-1000}"
+    environment:
+      VAULTFS_MASTERS: "master-0:9000,master-1:9000,master-2:9000"
+      VAULTFS_CERT: /etc/vaultfs/certs/client.crt
+      VAULTFS_KEY: /etc/vaultfs/certs/client.key
+      VAULTFS_CA: /etc/vaultfs/certs/ca.crt
+    volumes:
+      - ./certs:/etc/vaultfs/certs:ro
+      - ..:/work
+    working_dir: /work
+    networks: [vaultfs]
+
 volumes:
   master-0-data:
   master-1-data:

@@ -95,22 +95,22 @@ make certs    # generate the local development PKI
 make dev      # build images and start the full cluster (masters, chunk servers, Prometheus, Grafana)
 ```
 
-In another terminal, build the CLI and talk to the cluster over mTLS:
+In another terminal, drive the cluster with the CLI. Because VaultFS is
+GFS-style, clients talk to the chunk servers directly for data, so the CLI runs
+inside the cluster network, the same way an application reaches VaultFS in
+production. The repository root is mounted at `/work`:
 
 ```bash
-make build
+alias vfs='docker compose -f deploy/docker-compose.yml run --rm cli'
 
-# the cluster requires client certificates, so wrap the flags in an alias
-alias vfs='./bin/vaultfs --masters localhost:9000 \
-  --cert deploy/certs/client.crt \
-  --key  deploy/certs/client.key \
-  --ca   deploy/certs/ca.crt'
-
-vfs put ./README.md /docs/readme.md
+vfs put /work/README.md /docs/readme.md
 vfs ls  /docs
-vfs get /docs/readme.md ./out.md
+vfs get /docs/readme.md /work/out.md
 vfs status
 ```
+
+The `cli` service already has its master addresses and client certificate wired
+through environment variables, so no flags are needed.
 
 Open Grafana at [http://localhost:3000](http://localhost:3000) to watch the live
 cluster dashboard.
@@ -126,7 +126,9 @@ cluster dashboard.
 | `vaultfs status` | Show the Raft leader, term, and known chunk servers |
 
 Global flags: `--masters` (comma-separated addresses), `--timeout`, and the
-`--cert` / `--key` / `--ca` mTLS material.
+`--cert` / `--key` / `--ca` mTLS material. Each also reads a `VAULTFS_*`
+environment variable (`VAULTFS_MASTERS`, `VAULTFS_CERT`, and so on), so the same
+binary is convenient on a host and inside a container.
 
 ### Go SDK
 

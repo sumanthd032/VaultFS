@@ -4,6 +4,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,6 +15,23 @@ import (
 	"github.com/sumanthd032/vaultfs/internal/security"
 	"github.com/sumanthd032/vaultfs/pkg/client"
 )
+
+// envOr returns the value of key, or def when the variable is unset or empty.
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// mastersDefault reads the default master list from VAULTFS_MASTERS, falling
+// back to a local single-node address.
+func mastersDefault() []string {
+	if v := os.Getenv("VAULTFS_MASTERS"); v != "" {
+		return strings.Split(v, ",")
+	}
+	return []string{"localhost:9000"}
+}
 
 // options holds the global flags shared by all subcommands.
 type options struct {
@@ -36,14 +55,17 @@ func NewRootCommand() *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	root.PersistentFlags().StringSliceVar(&opts.masters, "masters", []string{"localhost:9000"},
-		"comma-separated master addresses")
+	// Flags default to their VAULTFS_* environment variables when set, so the
+	// same binary is convenient on a developer's host and inside a container.
+	// An explicit flag always overrides the environment.
+	root.PersistentFlags().StringSliceVar(&opts.masters, "masters", mastersDefault(),
+		"comma-separated master addresses (env VAULTFS_MASTERS)")
 	root.PersistentFlags().DurationVar(&opts.timeout, "timeout", 30*time.Second,
 		"per-command timeout")
-	root.PersistentFlags().StringVar(&opts.certFile, "cert", "", "client TLS certificate (enables mTLS)")
-	root.PersistentFlags().StringVar(&opts.keyFile, "key", "", "client TLS private key")
-	root.PersistentFlags().StringVar(&opts.caFile, "ca", "", "cluster CA certificate")
-	root.PersistentFlags().StringVar(&opts.serverName, "server-name", "", "override the expected server name on master certificates")
+	root.PersistentFlags().StringVar(&opts.certFile, "cert", envOr("VAULTFS_CERT", ""), "client TLS certificate (enables mTLS) (env VAULTFS_CERT)")
+	root.PersistentFlags().StringVar(&opts.keyFile, "key", envOr("VAULTFS_KEY", ""), "client TLS private key (env VAULTFS_KEY)")
+	root.PersistentFlags().StringVar(&opts.caFile, "ca", envOr("VAULTFS_CA", ""), "cluster CA certificate (env VAULTFS_CA)")
+	root.PersistentFlags().StringVar(&opts.serverName, "server-name", envOr("VAULTFS_SERVER_NAME", ""), "override the expected server name on master certificates (env VAULTFS_SERVER_NAME)")
 
 	root.AddCommand(
 		newPutCommand(opts),
