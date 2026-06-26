@@ -1,0 +1,20 @@
+# Applies the whole VaultFS cluster:
+#
+#   make certs
+#   kubectl apply -k deploy/k8s
+#
+# then populate the cert Secret as described in secret.yaml. The monitoring
+# overlay (ServiceMonitor + Grafana dashboard) is included but is a no-op unless
+# the Prometheus Operator CRDs are installed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - master-service.yaml
+  - master-statefulset.yaml
+  - chunkserver-service.yaml
+  - chunkserver-statefulset.yaml
+  - monitoring

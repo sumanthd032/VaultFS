@@ -1,0 +1,28 @@
+# Prometheus Operator ServiceMonitor that scrapes every VaultFS pod. It selects
+# the headless master and chunk-server services by their shared part-of label
+# and pulls the port named "metrics" on each (master :9001, chunk server :9101).
+# The metrics endpoints are plain HTTP, so the scheme is http even though the
+# gRPC ports use mTLS.
+#
+# Requires the Prometheus Operator CRDs (kube-prometheus-stack or equivalent).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vaultfs
+  namespace: vaultfs
+  labels:
+    app.kubernetes.io/name: vaultfs
+    app.kubernetes.io/part-of: vaultfs
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - vaultfs
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: vaultfs
+  endpoints:
+    - port: metrics
+      scheme: http
+      path: /metrics
+      interval: 15s

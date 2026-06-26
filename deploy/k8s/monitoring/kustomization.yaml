@@ -1,0 +1,24 @@
+# Monitoring overlay: the ServiceMonitor plus the Grafana dashboard.
+#
+# The dashboard is turned into a ConfigMap labelled grafana_dashboard so the
+# Grafana sidecar (kube-prometheus-stack) auto-imports it. Generating the
+# ConfigMap from the JSON file keeps a single source of truth shared with the
+# docker-compose dashboard.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: vaultfs
+
+resources:
+  - servicemonitor.yaml
+
+configMapGenerator:
+  - name: vaultfs-grafana-dashboard
+    files:
+      - grafana-dashboard.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+        app.kubernetes.io/part-of: vaultfs
+
+generatorOptions:
+  disableNameSuffixHash: true
