@@ -113,9 +113,11 @@ func handleInstallSnapshotGRPC(srv interface{}, ctx context.Context, dec func(in
 // GRPCTransport is a production Transport that sends Raft RPCs over gRPC using
 // gob encoding. Use NewGRPCTransport to create one.
 type GRPCTransport struct {
-	mu         sync.RWMutex // protects conns
+	mu         sync.RWMutex // protects conns, handler, and serving
 	id         string
 	server     *grpc.Server
+	ln         net.Listener
+	serving    bool
 	conns      map[string]*grpc.ClientConn // peer addr -> connection
 	handler    RPCHandler
 	clientCred credentials.TransportCredentials
@@ -155,36 +157,56 @@ func NewGRPCTransport(addr string, opts ...GRPCOption) (*GRPCTransport, error) {
 		srvOpts = append(srvOpts, grpc.Creds(o.serverCred))
 	}
 	srv := grpc.NewServer(srvOpts...)
-	t := &GRPCTransport{
-		server:     srv,
-		conns:      make(map[string]*grpc.ClientConn),
-		clientCred: o.clientCred,
-	}
 
+	// Bind the listener now so peers can connect (their RPCs queue until the
+	// server starts serving), but do not Serve yet: gRPC forbids registering a
+	// service after Serve has been called, so serving begins in Register once
+	// the handler is wired.
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("raft: listen on %s: %w", addr, err)
 	}
-	go func() {
-		if err := srv.Serve(ln); err != nil {
-			slog.Error("raft: grpc server stopped", "err", err)
-		}
-	}()
-	return t, nil
+	return &GRPCTransport{
+		server:     srv,
+		ln:         ln,
+		conns:      make(map[string]*grpc.ClientConn),
+		clientCred: o.clientCred,
+	}, nil
 }
 
-// Register wires the given RPCHandler into the gRPC server.
+// Register wires the given RPCHandler into the gRPC server and starts serving.
+// It must be called before the transport handles inbound RPCs; a transport used
+// only to dial peers never calls it.
 func (t *GRPCTransport) Register(id string, handler RPCHandler) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.id = id
 	t.handler = handler
 	t.server.RegisterService(&raftServiceDesc, handler)
+	t.serving = true
+	ln := t.ln
+	t.mu.Unlock()
+
+	go func() {
+		if err := t.server.Serve(ln); err != nil {
+			slog.Error("raft: grpc server stopped", "err", err)
+		}
+	}()
 }
 
-// Close stops the gRPC server and all client connections.
+// Close stops the gRPC server (or the bare listener if it never served) and all
+// client connections.
 func (t *GRPCTransport) Close() error {
-	t.server.GracefulStop()
+	t.mu.Lock()
+	serving := t.serving
+	ln := t.ln
+	t.mu.Unlock()
+
+	if serving {
+		t.server.GracefulStop() // also closes the listener
+	} else {
+		_ = ln.Close()
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, c := range t.conns {
