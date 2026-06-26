@@ -85,6 +85,31 @@ func TestSingleNodeBecomesLeader(t *testing.T) {
 	}
 }
 
+// TestSingleNodeProposeCommits verifies that a lone leader (no peers) commits
+// and applies proposed entries, reaching quorum with only itself.
+func TestSingleNodeProposeCommits(t *testing.T) {
+	commitCh := make(chan Entry, 4)
+	net := NewInMemNetwork()
+	cfg := testConfig("solo", nil, commitCh)
+	n := New(cfg)
+	n.Start(net.Transport("solo"))
+	t.Cleanup(n.Stop)
+
+	waitForLeader(t, []*Node{n})
+
+	if err := n.Propose(context.Background(), []byte("x")); err != nil {
+		t.Fatalf("Propose: %v", err)
+	}
+	select {
+	case e := <-commitCh:
+		if string(e.Command) != "x" {
+			t.Errorf("committed %q, want x", e.Command)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("single-node leader did not commit the proposed entry")
+	}
+}
+
 func TestThreeNodeElection(t *testing.T) {
 	nodes, _ := makeCluster(t, 3)
 	leader := waitForLeader(t, nodes)

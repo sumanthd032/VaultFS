@@ -93,6 +93,12 @@ func (n *Node) Propose(ctx context.Context, command []byte) error {
 	n.log.Append(e)
 	n.matchIndex[n.id] = nextIndex
 
+	// Try to advance the commit index immediately. With peers this is a no-op
+	// until they ack, but a single-node cluster (no peers) reaches quorum with
+	// only itself, so the entry must commit here rather than waiting for a peer
+	// AppendEntries reply that will never come.
+	n.advanceCommitIndex()
+
 	// Signal replication goroutines.
 	select {
 	case n.heartbeatSig <- struct{}{}:
