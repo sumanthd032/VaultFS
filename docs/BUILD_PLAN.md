@@ -13,7 +13,7 @@ the Write-Ahead Log and distributed clocks. Everything else depends on these.
 **Deliverables:**
 
 ### Project scaffold
-- `go.mod` — module `github.com/sumanthd032/vaultfs`, Go 1.22
+- `go.mod` — module `github.com/sumanthd032/vaultfs`, Go 1.26
 - `Makefile` — targets: `test`, `lint`, `build`, `proto`, `certs`, `dev`, `docker-build`
 - `.golangci.yml` — linter configuration
 - `.gitignore` — Go standard + `deploy/certs/` + binaries

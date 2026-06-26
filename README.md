@@ -7,7 +7,7 @@
 Inspired by the Google File System paper. Built for correctness, durability, and operational clarity.
 
 [![CI](https://github.com/sumanthd032/vaultfs/actions/workflows/ci.yml/badge.svg)](https://github.com/sumanthd032/vaultfs/actions)
-[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/go-1.26+-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -68,7 +68,7 @@ Open Grafana at http://localhost:3000 (admin/admin) to see the live cluster dash
 
 | Component | Technology |
 |-----------|-----------|
-| Language | Go 1.22+ |
+| Language | Go 1.26+ |
 | RPC | gRPC + Protocol Buffers |
 | Consensus | Custom Raft |
 | Metadata store | BadgerDB |

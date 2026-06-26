@@ -1,10 +1,10 @@
 module github.com/sumanthd032/vaultfs
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/dgraph-io/badger/v4 v4.9.2
-	google.golang.org/grpc v1.68.1
+	google.golang.org/grpc v1.81.1
 )
 
 require (

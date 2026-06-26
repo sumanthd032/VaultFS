@@ -4,7 +4,7 @@ Every technology choice is deliberate. This document records what we use and exa
 
 ---
 
-## Language: Go 1.22+
+## Language: Go 1.26+
 
 **Why Go:**
 - First-class goroutines and channels make distributed systems code natural to write
@@ -17,7 +17,9 @@ Every technology choice is deliberate. This document records what we use and exa
 **Why not Rust:** Steeper learning curve for distributed systems patterns; ecosystem less mature for this stack.
 **Why not C++:** Memory safety issues; no standard dependency management.
 
-Go version pinned in `go.mod`. Use `go 1.22` or later. Toolchain version also pinned.
+Go version pinned in `go.mod` via the `go` directive (`go 1.26.0`), which sets the
+minimum required toolchain. The directive uses the full `major.minor.patch` form,
+the modern convention since Go 1.21.
 
 ---
 
