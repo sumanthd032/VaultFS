@@ -52,7 +52,6 @@ func (n *Node) maybeStartElection() {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), n.cfg.ElectionMinTimeout)
-	defer cancel()
 
 	for _, peer := range peers {
 		wg.Add(1)
@@ -85,7 +84,15 @@ func (n *Node) maybeStartElection() {
 			}
 		}(peer)
 	}
-	// Don't wait - goroutines update state when they get replies.
+	// Don't block the main loop: the vote goroutines update state as replies
+	// arrive. Release the election context only once every vote RPC has
+	// returned or the timeout fires. A deferred cancel here would abort the
+	// in-flight RPCs the moment this function returns, before any reply could
+	// be counted, leaving the cluster unable to elect a leader.
+	go func() {
+		wg.Wait()
+		cancel()
+	}()
 }
 
 // HandleRequestVote processes an inbound RequestVote RPC (section 5.2, section 5.4).
