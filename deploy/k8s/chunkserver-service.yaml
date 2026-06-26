@@ -1,0 +1,23 @@
+# Headless service giving each chunk server a stable DNS name
+# (vaultfs-chunkserver-N.vaultfs-chunkserver) for the master's chunk map and for
+# per-pod metrics scraping.
+apiVersion: v1
+kind: Service
+metadata:
+  name: vaultfs-chunkserver
+  namespace: vaultfs
+  labels:
+    app.kubernetes.io/name: vaultfs
+    app.kubernetes.io/component: chunkserver
+    app.kubernetes.io/part-of: vaultfs
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: vaultfs
+    app.kubernetes.io/component: chunkserver
+  ports:
+    - name: grpc
+      port: 9100
+    - name: metrics
+      port: 9101

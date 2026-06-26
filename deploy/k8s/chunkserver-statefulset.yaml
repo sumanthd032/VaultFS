@@ -1,0 +1,95 @@
+# Chunk servers run as a StatefulSet so each replica keeps a stable identity and
+# its own persistent volume of chunk data across restarts and rescheduling. The
+# headless service vaultfs-chunkserver provides the stable DNS names the master
+# stores in its chunk map.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vaultfs-chunkserver
+  namespace: vaultfs
+  labels:
+    app.kubernetes.io/name: vaultfs
+    app.kubernetes.io/component: chunkserver
+    app.kubernetes.io/part-of: vaultfs
+spec:
+  serviceName: vaultfs-chunkserver
+  replicas: 3
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vaultfs
+      app.kubernetes.io/component: chunkserver
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vaultfs
+        app.kubernetes.io/component: chunkserver
+        app.kubernetes.io/part-of: vaultfs
+    spec:
+      securityContext:
+        runAsNonRoot: false
+        fsGroup: 65532
+      containers:
+        - name: chunkserver
+          image: ghcr.io/sumanthd032/vaultfs-chunkserver:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: vaultfs-config
+          env:
+            - name: VAULTFS_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: VAULTFS_LISTEN
+              value: ":9100"
+            - name: VAULTFS_METRICS_ADDR
+              value: ":9101"
+            - name: VAULTFS_DATA_DIR
+              value: /var/lib/vaultfs/chunks
+            - name: VAULTFS_CERT
+              value: /etc/vaultfs/certs/chunkserver.crt
+            - name: VAULTFS_KEY
+              value: /etc/vaultfs/certs/chunkserver.key
+          ports:
+            - name: grpc
+              containerPort: 9100
+            - name: metrics
+              containerPort: 9101
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/vaultfs/certs
+              readOnly: true
+            - name: chunks
+              mountPath: /var/lib/vaultfs/chunks
+      volumes:
+        - name: certs
+          secret:
+            secretName: vaultfs-certs
+  volumeClaimTemplates:
+    - metadata:
+        name: chunks
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
