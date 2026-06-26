@@ -15,5 +15,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 # Root distroless so the process can write to the mounted metadata volume.
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /out/master /usr/local/bin/master
-EXPOSE 9000 9200
+EXPOSE 9000 9200 9001
 ENTRYPOINT ["/usr/local/bin/master"]

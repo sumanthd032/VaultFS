@@ -12,5 +12,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 # Root distroless so the process can write to the mounted chunk-data volume.
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /out/chunkserver /usr/local/bin/chunkserver
-EXPOSE 9100
+EXPOSE 9100 9101
 ENTRYPOINT ["/usr/local/bin/chunkserver"]
