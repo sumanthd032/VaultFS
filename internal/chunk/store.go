@@ -165,3 +165,12 @@ func (s *Store) ListChunks() ([]ChunkID, error) {
 	}
 	return ids, nil
 }
+
+// Count returns the number of chunks currently stored.
+func (s *Store) Count() (int, error) {
+	ids, err := s.ListChunks()
+	if err != nil {
+		return 0, err
+	}
+	return len(ids), nil
+}

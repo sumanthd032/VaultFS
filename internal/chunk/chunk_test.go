@@ -459,3 +459,27 @@ func TestHeartbeatSenderDefaultInterval(t *testing.T) {
 		t.Errorf("interval = %v, want default %v", sender.interval, DefaultHeartbeatInterval)
 	}
 }
+
+func TestStoreCount(t *testing.T) {
+	s, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if n, err := s.Count(); err != nil || n != 0 {
+		t.Fatalf("empty count = %d, %v; want 0, nil", n, err)
+	}
+	if _, err := s.WriteChunk(ctx, []byte("alpha")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.WriteChunk(ctx, []byte("beta")); err != nil {
+		t.Fatal(err)
+	}
+	// Content-addressed: re-writing the same bytes does not add a chunk.
+	if _, err := s.WriteChunk(ctx, []byte("alpha")); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.Count(); err != nil || n != 2 {
+		t.Fatalf("count = %d, %v; want 2, nil", n, err)
+	}
+}
