@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -49,6 +50,38 @@ func envOr(env, def string) string {
 	return def
 }
 
+// envOrInt returns the integer value of env, or def when unset or unparsable.
+func envOrInt(env string, def int) int {
+	if v := os.Getenv(env); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+// dropSelf removes any peer that refers to this node from peers. A StatefulSet
+// gives every master pod the same env, so the peer list contains all masters
+// including this one; a node must not treat itself as a peer. Peers take the
+// form host[:port], where host is a DNS name whose first label is the pod (and
+// node) name, so a peer is self when that first label equals nodeID. In the
+// docker-compose setup peers already exclude self, so this is a no-op there.
+func dropSelf(peers []string, nodeID string) []string {
+	out := peers[:0]
+	for _, p := range peers {
+		host := p
+		if h, _, ok := strings.Cut(p, ":"); ok {
+			host = h
+		}
+		label, _, _ := strings.Cut(host, ".")
+		if label == nodeID {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
 // splitList splits a comma-separated list, dropping empty entries.
 func splitList(s string) []string {
 	var out []string
@@ -82,14 +115,14 @@ func parseConfig() config {
 	flag.StringVar(&raftPeers, "raft-peers", envOr("VAULTFS_RAFT_PEERS", ""), "comma-separated Raft addresses of other masters")
 	flag.StringVar(&c.dataDir, "data-dir", envOr("VAULTFS_DATA_DIR", "/var/lib/vaultfs/meta"), "metadata directory")
 	flag.StringVar(&chunkServers, "chunkservers", envOr("VAULTFS_CHUNKSERVERS", ""), "comma-separated chunk servers as id@addr")
-	flag.IntVar(&c.replication, "replication", metadata.DefaultReplicationFactor, "replication factor")
+	flag.IntVar(&c.replication, "replication", envOrInt("VAULTFS_REPLICATION", metadata.DefaultReplicationFactor), "replication factor")
 	flag.StringVar(&c.metricsAddr, "metrics-addr", envOr("VAULTFS_METRICS_ADDR", ":9001"), "Prometheus metrics HTTP address")
 	flag.StringVar(&c.certFile, "cert", envOr("VAULTFS_CERT", "/etc/vaultfs/certs/master.crt"), "TLS certificate")
 	flag.StringVar(&c.keyFile, "key", envOr("VAULTFS_KEY", "/etc/vaultfs/certs/master.key"), "TLS private key")
 	flag.StringVar(&c.caFile, "ca", envOr("VAULTFS_CA", "/etc/vaultfs/certs/ca.crt"), "cluster CA certificate")
 	flag.Parse()
 
-	c.raftPeers = splitList(raftPeers)
+	c.raftPeers = dropSelf(splitList(raftPeers), c.nodeID)
 	c.chunkNodes = parseChunkNodes(chunkServers)
 	return c
 }
