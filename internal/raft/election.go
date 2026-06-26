@@ -31,6 +31,9 @@ func (n *Node) maybeStartElection() {
 	peers := append([]string(nil), n.peers...)
 	n.mu.Unlock()
 
+	if n.cfg.OnElection != nil {
+		n.cfg.OnElection()
+	}
 	slog.Info("raft: starting election", "node", n.id, "term", term)
 
 	votes := int64(1) // vote for self

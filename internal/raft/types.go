@@ -47,6 +47,9 @@ type Config struct {
 	HeartbeatInterval  time.Duration
 	// CommitCh receives committed entries in order. If nil, commits are discarded.
 	CommitCh chan<- Entry
+	// OnElection, if set, is called whenever this node starts a new election.
+	// It keeps the Raft package decoupled from any metrics implementation.
+	OnElection func()
 }
 
 // DefaultConfig returns a production-ready Config for the given node and peers.

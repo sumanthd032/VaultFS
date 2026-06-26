@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 // DefaultMaxSegmentSize is the default rolling segment size (64 MiB).
@@ -20,6 +21,7 @@ type WAL struct {
 	segments []*segment // ordered oldest -> newest; last element is active
 	lastIdx  uint64
 	maxSegSz int64
+	onAppend func(time.Duration) // optional latency observer
 }
 
 // Option is a functional option for Open.
@@ -30,6 +32,13 @@ type Option func(*WAL)
 // segment before writing. Useful in tests to force rotation with small data.
 func WithMaxSegmentSize(n int64) Option {
 	return func(w *WAL) { w.maxSegSz = n }
+}
+
+// WithAppendObserver registers a callback invoked with the wall-clock duration
+// of each successful Append, used for latency metrics. It keeps the WAL
+// decoupled from any particular metrics implementation.
+func WithAppendObserver(fn func(time.Duration)) Option {
+	return func(w *WAL) { w.onAppend = fn }
 }
 
 // Open opens (or creates) a WAL rooted at dir.
@@ -64,6 +73,11 @@ func Open(dir string, opts ...Option) (*WAL, error) {
 // the WAL does not enforce monotonicity (Raft log replication needs this
 // flexibility during log truncation).
 func (w *WAL) Append(entry Entry) error {
+	if w.onAppend != nil {
+		start := time.Now()
+		defer func() { w.onAppend(time.Since(start)) }()
+	}
+
 	var buf bytes.Buffer
 	if err := entry.Encode(&buf); err != nil {
 		return err

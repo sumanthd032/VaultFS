@@ -34,6 +34,10 @@ type Monitor struct {
 	timeout           time.Duration
 	replicationFactor int
 	now               func() time.Time // injectable clock for tests
+
+	// OnNodeDead, if set, is called for each node a Sweep declares dead. It
+	// keeps the monitor decoupled from any metrics implementation.
+	OnNodeDead func(nodeID string)
 }
 
 // NewMonitor returns a Monitor over chunkMap. If timeout or factor are
@@ -91,6 +95,9 @@ func (m *Monitor) Sweep() (dead []string, tasks []ReplicationTask) {
 
 	for _, id := range dead {
 		m.chunkMap.RemoveNode(id)
+		if m.OnNodeDead != nil {
+			m.OnNodeDead(id)
+		}
 		slog.Warn("chunk server declared dead", "node_id", id)
 	}
 

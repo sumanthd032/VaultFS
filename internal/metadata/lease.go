@@ -118,6 +118,21 @@ func (m *LeaseManager) Check(chunkID string) (Lease, bool) {
 	return *existing, true
 }
 
+// Count returns the number of currently valid (unexpired) leases.
+func (m *LeaseManager) Count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := m.now()
+	var n int
+	for _, lease := range m.leases {
+		if !lease.expired(now) {
+			n++
+		}
+	}
+	return n
+}
+
 // SweepExpired removes all expired leases and returns how many were reclaimed.
 // A master may call this periodically; expiry is also enforced lazily on access.
 func (m *LeaseManager) SweepExpired() int {
