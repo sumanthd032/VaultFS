@@ -35,7 +35,7 @@ func (l Lease) expired(now time.Time) bool {
 // time-based expiry. It is safe for concurrent use.
 type LeaseManager struct {
 	mu     sync.Mutex        // protects leases
-	leases map[string]*Lease // chunkID → active lease
+	leases map[string]*Lease // chunkID -> active lease
 
 	ttl time.Duration
 	now func() time.Time // injectable clock for tests

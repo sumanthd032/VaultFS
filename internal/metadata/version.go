@@ -36,7 +36,7 @@ func (v ChunkVersion) Merge(other ChunkVersion) ChunkVersion {
 	}
 }
 
-// HappensBefore reports whether v causally precedes other (v → other).
+// HappensBefore reports whether v causally precedes other (v -> other).
 func (v ChunkVersion) HappensBefore(other ChunkVersion) bool {
 	return v.Clock.HappensBefore(other.Clock)
 }

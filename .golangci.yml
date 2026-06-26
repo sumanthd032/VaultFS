@@ -26,8 +26,8 @@ linters:
       - linters:
           - gosec
         text: "G304:"
-      # Test files are exempt from gosec — they construct paths from t.TempDir()
-      # and use small int→byte conversions with no production security impact.
+      # Test files are exempt from gosec - they construct paths from t.TempDir()
+      # and use small int->byte conversions with no production security impact.
       - path: '_test\.go'
         linters:
           - gosec

@@ -8,10 +8,10 @@ type Location struct {
 	Address string
 }
 
-// ChunkMap is an in-memory map of chunk ID → replica locations.
+// ChunkMap is an in-memory map of chunk ID -> replica locations.
 // It is safe for concurrent use.
 type ChunkMap struct {
-	mu        sync.RWMutex       // protects locations
+	mu        sync.RWMutex // protects locations
 	locations map[string][]Location
 }
 

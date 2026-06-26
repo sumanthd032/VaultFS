@@ -1,4 +1,4 @@
-# Tech Stack — VaultFS
+# Tech Stack - VaultFS
 
 Every technology choice is deliberate. This document records what we use and exactly why.
 
@@ -40,10 +40,10 @@ the modern convention since Go 1.21.
 **Proto structure:**
 ```
 proto/
-  master.proto       — MasterService (namespace + lease operations)
-  chunk.proto        — ChunkService (read/write/delete chunks)
-  admin.proto        — AdminService (cluster health, GC)
-  types.proto        — shared types (ChunkID, NodeID, FileInfo, etc.)
+  master.proto       - MasterService (namespace + lease operations)
+  chunk.proto        - ChunkService (read/write/delete chunks)
+  admin.proto        - AdminService (cluster health, GC)
+  types.proto        - shared types (ChunkID, NodeID, FileInfo, etc.)
 ```
 
 ---
@@ -57,27 +57,27 @@ proto/
 - Shows up strongly in interviews: "walk me through your Raft implementation."
 
 **What we implement:**
-- Leader election with randomized election timeouts (150–300ms)
+- Leader election with randomized election timeouts (150-300ms)
 - Heartbeat-based lease renewal (50ms interval)
 - Log replication with majority quorum
 - Log compaction via snapshotting (once log exceeds 10,000 entries)
-- Cluster membership changes (add/remove nodes) — joint consensus
+- Cluster membership changes (add/remove nodes) - joint consensus
 
 **What we do NOT implement:**
-- Multi-Raft (one Raft group per shard) — out of scope
-- Pipelining of log entries — clean implementation first, optimize later
+- Multi-Raft (one Raft group per shard) - out of scope
+- Pipelining of log entries - clean implementation first, optimize later
 
 ---
 
 ## Metadata Store: BadgerDB
 
 **Why BadgerDB:**
-- Embedded — no external process to run, no ops overhead
+- Embedded - no external process to run, no ops overhead
 - Go-native library (DGraph)
-- LSM-tree based — fast writes, good for the master's workload
+- LSM-tree based - fast writes, good for the master's workload
 - ACID transactions
 - Supports prefix iteration (needed for directory listing: scan all keys with prefix `/data/logs/`)
-- Survives restarts — metadata is durable
+- Survives restarts - metadata is durable
 
 **Why not BoltDB:** BadgerDB has better write throughput; BoltDB is B-tree (better for reads). Master has more writes than reads at scale.
 **Why not SQLite:** No complex relational queries needed; key-value is the right abstraction.
@@ -85,10 +85,10 @@ proto/
 
 **Key layout in BadgerDB:**
 ```
-inode:{path}        → InodeProto (file metadata)
-chunk:{chunkID}     → ChunkMetaProto (version, size, deleted flag)
-gc:{chunkID}        → GCEntryProto (scheduled for deletion at time T)
-lease:{chunkID}     → LeaseProto (primary node, expiry)
+inode:{path}        -> InodeProto (file metadata)
+chunk:{chunkID}     -> ChunkMetaProto (version, size, deleted flag)
+gc:{chunkID}        -> GCEntryProto (scheduled for deletion at time T)
+lease:{chunkID}     -> LeaseProto (primary node, expiry)
 ```
 
 ---
@@ -96,22 +96,22 @@ lease:{chunkID}     → LeaseProto (primary node, expiry)
 ## Chunk Addressing: SHA-256
 
 **Why SHA-256:**
-- Cryptographic hash → collision probability negligible (2^-128 for SHA-256 truncated to 128 bits)
-- Any bit flip in chunk data changes the hash → silent corruption detected on every read
+- Cryptographic hash -> collision probability negligible (2^-128 for SHA-256 truncated to 128 bits)
+- Any bit flip in chunk data changes the hash -> silent corruption detected on every read
 - Content-addressability: identical files share chunks automatically (deduplication)
 - Standard library: `crypto/sha256` in Go stdlib, zero external dependency
 
 **Chunk size: 64 MB**
 Following the GFS paper. Large chunks reduce master load (fewer metadata entries per file).
-The trade-off is wasted space for small files — acceptable for our use case.
+The trade-off is wasted space for small files - acceptable for our use case.
 
 ---
 
 ## Clocks: Lamport Clocks + Vector Clocks
 
 **Why both:**
-- **Lamport clocks** — total ordering of events across nodes. Used to order log entries within the WAL and across master replicas. Cheap: one uint64 per node.
-- **Vector clocks** — causal ordering. Used to detect write conflicts when two clients write the same chunk concurrently without going through the master. Each chunk's version is a vector clock.
+- **Lamport clocks** - total ordering of events across nodes. Used to order log entries within the WAL and across master replicas. Cheap: one uint64 per node.
+- **Vector clocks** - causal ordering. Used to detect write conflicts when two clients write the same chunk concurrently without going through the master. Each chunk's version is a vector clock.
 
 These are implemented in `internal/clock/` and used by both the WAL and the chunk replication logic.
 
@@ -136,13 +136,13 @@ These are implemented in `internal/clock/` and used by both the WAL and the chun
 ## Write-Ahead Log: Custom
 
 **Why a custom WAL:**
-- Core distributed systems primitive — must understand deeply
+- Core distributed systems primitive - must understand deeply
 - BadgerDB handles master metadata durability; chunk servers need their own WAL for chunk data
 - The WAL is the durability guarantee for chunk servers: even if the process crashes mid-write, recovery replays the WAL to reconstruct committed state
 
 **WAL design:**
 - Segmented: rolling files of up to 64MB each, older segments deleted after snapshot
-- Entry format: `[length:4][crc32:4][data:N]` — self-describing, crash-recoverable
+- Entry format: `[length:4][crc32:4][data:N]` - self-describing, crash-recoverable
 - `fsync` on every append (configurable: can use `fdatasync` for performance)
 - Recovery: scan all segments, replay valid entries, discard entries after last valid CRC
 
@@ -157,7 +157,7 @@ These are implemented in `internal/clock/` and used by both the WAL and the chun
 
 **Why Grafana:**
 - The dashboard JSON is committed to the repo (`deploy/k8s/monitoring/grafana-dashboard.json`)
-- Anyone cloning the repo can import it immediately — one-command observability
+- Anyone cloning the repo can import it immediately - one-command observability
 - Shows operational maturity: a project with a Grafana dashboard is a serious project
 
 **Six core metrics:**
@@ -184,10 +184,10 @@ These are implemented in `internal/clock/` and used by both the WAL and the chun
 **Compose topology:**
 ```yaml
 services:
-  master-0, master-1, master-2       — Master nodes
-  chunkserver-0, chunkserver-1, chunkserver-2  — Chunk servers
-  prometheus                         — Scrapes all /metrics endpoints
-  grafana                            — Dashboards (auto-provisioned)
+  master-0, master-1, master-2       - Master nodes
+  chunkserver-0, chunkserver-1, chunkserver-2  - Chunk servers
+  prometheus                         - Scrapes all /metrics endpoints
+  grafana                            - Dashboards (auto-provisioned)
 ```
 
 ---
@@ -240,9 +240,9 @@ Key linters enabled: `errcheck`, `govet`, `staticcheck`, `gosec`, `exhaustruct`.
 
 **Commands:**
 ```
-vaultfs put <local-path> <remote-path>   — upload file
-vaultfs get <remote-path> <local-path>   — download file
-vaultfs ls  <remote-path>                — list directory
-vaultfs rm  <remote-path>                — delete file
-vaultfs status                           — cluster health (leader, nodes, replication)
+vaultfs put <local-path> <remote-path>   - upload file
+vaultfs get <remote-path> <local-path>   - download file
+vaultfs ls  <remote-path>                - list directory
+vaultfs rm  <remote-path>                - delete file
+vaultfs status                           - cluster health (leader, nodes, replication)
 ```

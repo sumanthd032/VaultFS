@@ -23,7 +23,7 @@ type ChunkID string
 // meaning the data was corrupted in storage or transit.
 var ErrChecksumFailed = errors.New("chunk: SHA-256 mismatch, data corrupted")
 
-// idLen is the length of a valid ChunkID (SHA-256 → 32 bytes → 64 hex chars).
+// idLen is the length of a valid ChunkID (SHA-256 -> 32 bytes -> 64 hex chars).
 const idLen = sha256.Size * 2
 
 // Hash computes the ChunkID for data.

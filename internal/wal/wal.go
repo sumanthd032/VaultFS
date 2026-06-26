@@ -17,7 +17,7 @@ const DefaultMaxSegmentSize int64 = 64 * 1024 * 1024
 type WAL struct {
 	mu       sync.Mutex // protects segments, lastIdx
 	dir      string
-	segments []*segment // ordered oldest → newest; last element is active
+	segments []*segment // ordered oldest -> newest; last element is active
 	lastIdx  uint64
 	maxSegSz int64
 }

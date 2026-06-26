@@ -27,9 +27,9 @@ import (
 var ErrChecksumMismatch = errors.New("wal: CRC32 checksum mismatch")
 
 const (
-	lenFieldSize = 8  // bytes for the payload-length prefix
-	crcFieldSize = 4  // bytes for the CRC32 field
-	idxFieldSize = 8  // bytes for the entry index inside the payload
+	lenFieldSize = 8 // bytes for the payload-length prefix
+	crcFieldSize = 4 // bytes for the CRC32 field
+	idxFieldSize = 8 // bytes for the entry index inside the payload
 	headerSize   = lenFieldSize + crcFieldSize
 	// maxPayloadSize guards against allocating huge buffers on corrupted length fields.
 	maxPayloadSize = 128 * 1024 * 1024 // 128 MiB

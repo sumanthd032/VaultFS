@@ -55,7 +55,7 @@ func TestLeaseExpiry(t *testing.T) {
 		t.Fatal("lease should be valid immediately after grant")
 	}
 
-	// Advance past the TTL — the lease must now read as absent.
+	// Advance past the TTL - the lease must now read as absent.
 	m.now = func() time.Time { return base.Add(2 * time.Minute) }
 	if _, ok := m.Check("c1"); ok {
 		t.Error("lease should have expired")

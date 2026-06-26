@@ -115,7 +115,7 @@ func (ns *Namespace) ListDir(dir string) ([]FileInfo, error) {
 	}
 
 	// Prefix to scan: "ns:" + dir + "/"
-	// We want direct children only — no nested slashes after the prefix.
+	// We want direct children only - no nested slashes after the prefix.
 	scanPrefix := nsPrefix + strings.TrimSuffix(dir, "/") + "/"
 	prefix := []byte(scanPrefix)
 

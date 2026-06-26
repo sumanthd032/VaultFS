@@ -11,7 +11,7 @@ import (
 
 // replayFile reads all valid entries from the segment at path.
 //
-// It stops—without returning an error—when it encounters:
+// It stops-without returning an error-when it encounters:
 //   - io.EOF (clean end of file)
 //   - io.ErrUnexpectedEOF (crash-truncated partial entry)
 //   - ErrChecksumMismatch (bit-flipped data)

@@ -1,10 +1,10 @@
-# Conventions — VaultFS
+# Conventions - VaultFS
 
 Code style, commit rules, and the step log template.
 
 ---
 
-## Commit Style — Conventional Commits
+## Commit Style - Conventional Commits
 
 Format: `<type>(<scope>): <subject>`
 
@@ -20,11 +20,11 @@ Format: `<type>(<scope>): <subject>`
 | `perf` | Performance improvement |
 
 ### Scopes
-`wal` · `raft` · `chunk` · `metadata` · `client` · `cli` · `sdk` · `proto` · `security` · `metrics` · `deploy` · `k8s` · `ci`
+`wal` | `raft` | `chunk` | `metadata` | `client` | `cli` | `sdk` | `proto` | `security` | `metrics` | `deploy` | `k8s` | `ci`
 
 ### Rules
 - Subject: imperative mood, lowercase, no period, max 72 characters
-- Body (optional): explain *why*, not *what* — the diff shows what
+- Body (optional): explain *why*, not *what* - the diff shows what
 - **Never add `Co-authored-by: Claude` or any AI attribution**
 - Every commit must leave the repo with passing tests
 - Commit logical units, not one mega-commit per step
@@ -54,7 +54,7 @@ package wal
 
 ### Error handling
 ```go
-// Wrap with context — caller should know where the error came from
+// Wrap with context - caller should know where the error came from
 return fmt.Errorf("chunk store: write chunk %s: %w", id, err)
 
 // Sentinel errors at package level
@@ -71,7 +71,7 @@ if err != nil {
 _ = n // explicit discard if truly unused
 ```
 
-### Interfaces — small, consumer-side
+### Interfaces - small, consumer-side
 ```go
 // In the package that USES the log, define what it needs:
 type LogAppender interface {
@@ -80,7 +80,7 @@ type LogAppender interface {
 // Not in the WAL package. The WAL exports the concrete type.
 ```
 
-### Context — everywhere blocking
+### Context - everywhere blocking
 ```go
 // Every function that does I/O or can block:
 func (cs *ChunkServer) ReadChunk(ctx context.Context, id ChunkID) ([]byte, error)
@@ -94,7 +94,7 @@ case entry := <-entries:
 }
 ```
 
-### Mutexes — always documented
+### Mutexes - always documented
 ```go
 type Master struct {
     mu        sync.RWMutex  // protects chunkMap, namespace, and leases
@@ -104,7 +104,7 @@ type Master struct {
 }
 ```
 
-### Tests — always table-driven
+### Tests - always table-driven
 ```go
 func TestVectorClockHappensBefore(t *testing.T) {
     tests := []struct {
@@ -138,7 +138,7 @@ func TestVectorClockHappensBefore(t *testing.T) {
 
 ### Temporary directories in tests
 ```go
-// Always use t.TempDir() — cleaned up automatically, never hardcode paths
+// Always use t.TempDir() - cleaned up automatically, never hardcode paths
 func TestWALCrashRecovery(t *testing.T) {
     dir := t.TempDir()
     w, err := wal.Open(dir)
@@ -168,7 +168,7 @@ slog.Debug("wal entry appended", "index", entry.Index, "size", len(entry.Data))
 
 ### Naming
 ```go
-// No stutter — the package name is already the namespace
+// No stutter - the package name is already the namespace
 raft.Node          // not raft.RaftNode
 wal.Entry          // not wal.WALEntry
 chunk.Store        // not chunk.ChunkStore
@@ -193,25 +193,25 @@ const (
 
 ```go
 // NO panic in library code
-panic("something went wrong")  // NEVER — return the error
+panic("something went wrong")  // NEVER - return the error
 
 // NO init() functions
-func init() { ... }  // NEVER — explicit initialization in constructors
+func init() { ... }  // NEVER - explicit initialization in constructors
 
 // NO global state
-var globalMaster *Master  // NEVER — inject via constructor
+var globalMaster *Master  // NEVER - inject via constructor
 
 // NO untyped any where avoidable
 func Process(data any) any  // NEVER if concrete types work
 
 // NO log.Fatal outside main
-log.Fatal("something bad")  // NEVER in internal/ or pkg/ — return error
+log.Fatal("something bad")  // NEVER in internal/ or pkg/ - return error
 
 // NO skipping errors
-json.Marshal(v)  // NEVER — assign and check the error
+json.Marshal(v)  // NEVER - assign and check the error
 
 // NO fmt.Println in library code
-fmt.Println("debug info")  // NEVER — use slog.Debug
+fmt.Println("debug info")  // NEVER - use slog.Debug
 ```
 
 ---
@@ -221,7 +221,7 @@ fmt.Println("debug info")  // NEVER — use slog.Debug
 After each step completes, create `docs/step-logs/STEP_N.md` with this structure:
 
 ```markdown
-# Step N — [Step Name]
+# Step N - [Step Name]
 
 ## What was built
 

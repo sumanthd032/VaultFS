@@ -67,7 +67,7 @@ func (n *Node) sendSnapshot(peer string) {
 	n.nextIndex[peer] = args.LastIncludedIndex + 1
 }
 
-// HandleInstallSnapshot processes an inbound InstallSnapshot RPC (§7).
+// HandleInstallSnapshot processes an inbound InstallSnapshot RPC (section 7).
 func (n *Node) HandleInstallSnapshot(_ context.Context, args InstallSnapshotArgs) (InstallSnapshotReply, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()

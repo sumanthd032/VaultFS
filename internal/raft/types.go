@@ -61,7 +61,7 @@ func DefaultConfig(id string, peers []string, commitCh chan<- Entry) Config {
 	}
 }
 
-// RequestVoteArgs is the payload for the RequestVote RPC (§5.2).
+// RequestVoteArgs is the payload for the RequestVote RPC (section 5.2).
 type RequestVoteArgs struct {
 	Term         uint64
 	CandidateID  string
@@ -75,7 +75,7 @@ type RequestVoteReply struct {
 	VoteGranted bool
 }
 
-// AppendEntriesArgs is the payload for the AppendEntries RPC (§5.3).
+// AppendEntriesArgs is the payload for the AppendEntries RPC (section 5.3).
 // When Entries is empty this acts as a heartbeat.
 type AppendEntriesArgs struct {
 	Term         uint64
@@ -87,7 +87,7 @@ type AppendEntriesArgs struct {
 }
 
 // AppendEntriesReply is the reply for the AppendEntries RPC.
-// ConflictIndex/ConflictTerm support the fast log back-up optimisation (§5.3).
+// ConflictIndex/ConflictTerm support the fast log back-up optimisation (section 5.3).
 type AppendEntriesReply struct {
 	Term          uint64
 	Success       bool
@@ -95,7 +95,7 @@ type AppendEntriesReply struct {
 	ConflictTerm  uint64
 }
 
-// InstallSnapshotArgs is the payload for the InstallSnapshot RPC (§7).
+// InstallSnapshotArgs is the payload for the InstallSnapshot RPC (section 7).
 type InstallSnapshotArgs struct {
 	Term              uint64
 	LeaderID          string

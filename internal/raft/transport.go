@@ -30,8 +30,8 @@ type RPCHandler interface {
 // injected to simulate network failures.
 type InMemNetwork struct {
 	mu         sync.RWMutex
-	handlers   map[string]RPCHandler    // nodeID → handler
-	partitions map[[2]string]struct{}   // {from,to} pairs that are blocked
+	handlers   map[string]RPCHandler  // nodeID -> handler
+	partitions map[[2]string]struct{} // {from,to} pairs that are blocked
 }
 
 // NewInMemNetwork returns an empty in-process test network.
@@ -129,7 +129,7 @@ func (t *inMemTransport) Close() error { return nil }
 
 func (t *inMemTransport) reach(peer string) (RPCHandler, error) {
 	if t.net.isPartitioned(t.id, peer) {
-		return nil, fmt.Errorf("raft: %s → %s is partitioned", t.id, peer)
+		return nil, fmt.Errorf("raft: %s -> %s is partitioned", t.id, peer)
 	}
 	h, ok := t.net.getHandler(peer)
 	if !ok {

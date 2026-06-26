@@ -21,7 +21,7 @@ func openTestStore(t *testing.T) *Store {
 	return s
 }
 
-// ── Store ────────────────────────────────────────────────────────────────────
+// -- Store --------------------------------------------------------------------
 
 func TestStorePutGet(t *testing.T) {
 	s := openTestStore(t)
@@ -114,7 +114,7 @@ func TestStoreTxnDiscard(t *testing.T) {
 	}
 }
 
-// ── Namespace ────────────────────────────────────────────────────────────────
+// -- Namespace ----------------------------------------------------------------
 
 func openTestNamespace(t *testing.T) *Namespace {
 	t.Helper()
@@ -236,7 +236,7 @@ func TestNamespaceUpdateFile(t *testing.T) {
 	}
 }
 
-// ── ChunkMap ──────────────────────────────────────────────────────────────────
+// -- ChunkMap ------------------------------------------------------------------
 
 func TestChunkMapAddAndGet(t *testing.T) {
 	cm := NewChunkMap()
@@ -310,7 +310,7 @@ func TestChunkMapGetUnknown(t *testing.T) {
 	}
 }
 
-// ── ChunkVersion ──────────────────────────────────────────────────────────────
+// -- ChunkVersion --------------------------------------------------------------
 
 func TestChunkVersionHappensBefore(t *testing.T) {
 	a := NewChunkVersion("c1")

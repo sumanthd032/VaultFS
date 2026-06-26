@@ -82,10 +82,10 @@ func (n *Node) maybeStartElection() {
 			}
 		}(peer)
 	}
-	// Don't wait — goroutines update state when they get replies.
+	// Don't wait - goroutines update state when they get replies.
 }
 
-// HandleRequestVote processes an inbound RequestVote RPC (§5.2, §5.4).
+// HandleRequestVote processes an inbound RequestVote RPC (section 5.2, section 5.4).
 func (n *Node) HandleRequestVote(_ context.Context, args RequestVoteArgs) (RequestVoteReply, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -118,7 +118,7 @@ func (n *Node) HandleRequestVote(_ context.Context, args RequestVoteArgs) (Reque
 }
 
 // logUpToDate returns true if the candidate's log is at least as up-to-date as
-// ours, using the Raft log comparison rule (§5.4.1).
+// ours, using the Raft log comparison rule (section 5.4.1).
 // Must be called with n.mu held.
 func (n *Node) logUpToDate(candidateLastIndex, candidateLastTerm uint64) bool {
 	myLastTerm := n.log.lastTerm()

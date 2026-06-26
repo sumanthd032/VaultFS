@@ -34,8 +34,8 @@ type Node struct {
 	lastApplied uint64
 
 	// Leader-only volatile state (re-initialised on each election win).
-	nextIndex  map[string]uint64 // peer → next log index to send
-	matchIndex map[string]uint64 // peer → highest replicated index
+	nextIndex  map[string]uint64 // peer -> next log index to send
+	matchIndex map[string]uint64 // peer -> highest replicated index
 
 	transport Transport
 

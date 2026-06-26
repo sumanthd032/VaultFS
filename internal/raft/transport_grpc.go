@@ -112,10 +112,10 @@ func handleInstallSnapshotGRPC(srv interface{}, ctx context.Context, dec func(in
 // GRPCTransport is a production Transport that sends Raft RPCs over gRPC using
 // gob encoding. Use NewGRPCTransport to create one.
 type GRPCTransport struct {
-	mu      sync.RWMutex     // protects conns
+	mu      sync.RWMutex // protects conns
 	id      string
 	server  *grpc.Server
-	conns   map[string]*grpc.ClientConn // peer addr → connection
+	conns   map[string]*grpc.ClientConn // peer addr -> connection
 	handler RPCHandler
 }
 

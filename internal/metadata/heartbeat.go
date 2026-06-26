@@ -28,7 +28,7 @@ type ReplicationTask struct {
 // chunk map and surfaces the chunks that must be re-replicated.
 type Monitor struct {
 	mu       sync.Mutex           // protects lastSeen
-	lastSeen map[string]time.Time // node ID → time of most recent heartbeat
+	lastSeen map[string]time.Time // node ID -> time of most recent heartbeat
 
 	chunkMap          *ChunkMap
 	timeout           time.Duration

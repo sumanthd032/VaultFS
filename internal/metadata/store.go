@@ -3,7 +3,7 @@
 //
 //   - Store: raw key/value access with transactions.
 //   - Namespace: a POSIX-like inode tree (files, directories, rename).
-//   - ChunkMap: an in-memory map of chunk ID → replica node locations.
+//   - ChunkMap: an in-memory map of chunk ID -> replica node locations.
 //   - ChunkVersion: per-chunk vector clocks for write-conflict detection.
 package metadata
 
@@ -62,7 +62,7 @@ func (s *Store) Get(key []byte) ([]byte, error) {
 	return val, nil
 }
 
-// Put writes key → val, overwriting any existing value.
+// Put writes key -> val, overwriting any existing value.
 func (s *Store) Put(key, val []byte) error {
 	if err := s.db.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, val)
@@ -131,7 +131,7 @@ func (t *Txn) Get(key []byte) ([]byte, error) {
 	return val, nil
 }
 
-// Set writes key → val within the transaction.
+// Set writes key -> val within the transaction.
 func (t *Txn) Set(key, val []byte) error {
 	if err := t.txn.Set(key, val); err != nil {
 		return fmt.Errorf("metadata: txn set %q: %w", key, err)

@@ -70,11 +70,11 @@ func makeCluster(t *testing.T, count int) ([]*Node, *InMemNetwork) {
 	return nodes, net
 }
 
-// ── election ────────────────────────────────────────────────────────────────
+// -- election ----------------------------------------------------------------
 
 func TestSingleNodeBecomesLeader(t *testing.T) {
 	net := NewInMemNetwork()
-	cfg := testConfig("A", nil, nil) // no peers → majority is just self
+	cfg := testConfig("A", nil, nil) // no peers -> majority is just self
 	n := New(cfg)
 	n.Start(net.Transport("A"))
 	t.Cleanup(n.Stop)
@@ -95,7 +95,7 @@ func TestThreeNodeElection(t *testing.T) {
 			continue
 		}
 		if n.State() == Leader {
-			t.Errorf("node %s is also a leader — split brain", n.id)
+			t.Errorf("node %s is also a leader - split brain", n.id)
 		}
 	}
 }
@@ -109,7 +109,7 @@ func TestElectionTermAdvances(t *testing.T) {
 	nodes, _ := makeCluster(t, 3)
 	waitForLeader(t, nodes)
 
-	// All nodes should be in the same term (≥ 1).
+	// All nodes should be in the same term (>= 1).
 	terms := make([]uint64, len(nodes))
 	for i, n := range nodes {
 		terms[i] = n.Term()
@@ -119,7 +119,7 @@ func TestElectionTermAdvances(t *testing.T) {
 	}
 }
 
-// ── heartbeats ──────────────────────────────────────────────────────────────
+// -- heartbeats --------------------------------------------------------------
 
 func TestHeartbeatPreventsFollowerElection(t *testing.T) {
 	nodes, _ := makeCluster(t, 3)
@@ -129,7 +129,7 @@ func TestHeartbeatPreventsFollowerElection(t *testing.T) {
 	// Let the cluster run for several heartbeat intervals.
 	time.Sleep(100 * time.Millisecond)
 
-	// Term should not have changed — no spurious elections while leader is alive.
+	// Term should not have changed - no spurious elections while leader is alive.
 	if leader.State() != Leader {
 		t.Fatal("leader was deposed without a partition")
 	}
@@ -138,7 +138,7 @@ func TestHeartbeatPreventsFollowerElection(t *testing.T) {
 	}
 }
 
-// ── log replication ─────────────────────────────────────────────────────────
+// -- log replication ---------------------------------------------------------
 
 func TestLogReplicationToQuorum(t *testing.T) {
 	commitChs := make([]chan Entry, 3)
@@ -212,7 +212,7 @@ func TestProposeRejectsOnFollower(t *testing.T) {
 	}
 }
 
-// ── leader failure ──────────────────────────────────────────────────────────
+// -- leader failure ----------------------------------------------------------
 
 func TestLeaderFailureTriggerReelection(t *testing.T) {
 	nodes, _ := makeCluster(t, 3)
@@ -240,7 +240,7 @@ func TestLeaderFailureTriggerReelection(t *testing.T) {
 	}
 }
 
-// ── partition & heal ────────────────────────────────────────────────────────
+// -- partition & heal --------------------------------------------------------
 
 func TestLogConsistencyAfterPartitionHeals(t *testing.T) {
 	commitChs := make([]chan Entry, 3)
@@ -288,7 +288,7 @@ func TestLogConsistencyAfterPartitionHeals(t *testing.T) {
 	// The two followers must elect a new leader.
 	newLeader := waitForLeader(t, followers)
 
-	// Commit one entry via the new leader (old leader can't commit — no quorum).
+	// Commit one entry via the new leader (old leader can't commit - no quorum).
 	if err := newLeader.Propose(context.Background(), []byte{0x02}); err != nil {
 		t.Fatalf("post-partition Propose: %v", err)
 	}
@@ -342,7 +342,7 @@ func drainEntries(t *testing.T, chs []chan Entry, n int, timeout time.Duration) 
 	}
 }
 
-// ── raftLog unit tests ───────────────────────────────────────────────────────
+// -- raftLog unit tests -------------------------------------------------------
 
 func TestRaftLogAppendAndGet(t *testing.T) {
 	l := newRaftLog()
@@ -391,7 +391,7 @@ func TestRaftLogSetSnapshot(t *testing.T) {
 	if l.snapIndex != 5 {
 		t.Errorf("snapIndex = %d, want 5", l.snapIndex)
 	}
-	if l.Len() != 5 { // entries 6–10 remain
+	if l.Len() != 5 { // entries 6-10 remain
 		t.Errorf("Len = %d, want 5", l.Len())
 	}
 	if l.LastIndex() != 10 {

@@ -24,7 +24,7 @@ const fanoutLen = 2
 type Store struct {
 	root string
 
-	mu      sync.Mutex          // protects writing, guarding concurrent writes of the same id
+	mu      sync.Mutex           // protects writing, guarding concurrent writes of the same id
 	writing map[ChunkID]struct{} // chunk IDs with an in-flight write
 }
 

@@ -16,7 +16,7 @@ type ChunkSender interface {
 }
 
 // Replicator stores chunks locally and forwards them along a replication chain,
-// GFS-style: data flows linearly primary → secondary → secondary rather than
+// GFS-style: data flows linearly primary -> secondary -> secondary rather than
 // fanning out from the primary, so each node's outbound bandwidth is used once.
 type Replicator struct {
 	store  *Store

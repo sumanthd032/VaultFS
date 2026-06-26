@@ -7,7 +7,7 @@ import (
 	"github.com/sumanthd032/vaultfs/internal/clock"
 )
 
-// ── LamportClock ─────────────────────────────────────────────────────────────
+// -- LamportClock -------------------------------------------------------------
 
 // TestLamportClock_Tick verifies that Tick advances the clock monotonically
 // and returns the new value after each increment.
@@ -42,7 +42,7 @@ func TestLamportClock_Monotonic(t *testing.T) {
 	for range 1000 {
 		next := c.Tick()
 		if next <= prev {
-			t.Fatalf("clock went backwards: %d → %d", prev, next)
+			t.Fatalf("clock went backwards: %d -> %d", prev, next)
 		}
 		prev = next
 	}
@@ -69,7 +69,7 @@ func TestLamportClock_Update_HigherReceived(t *testing.T) {
 			}
 			got := c.Update(tt.received)
 			if got < tt.wantMin {
-				t.Errorf("Update(%d) = %d, want ≥ %d (local was %d)",
+				t.Errorf("Update(%d) = %d, want >= %d (local was %d)",
 					tt.received, got, tt.wantMin, tt.local)
 			}
 		})
@@ -99,7 +99,7 @@ func TestLamportClock_Now(t *testing.T) {
 	before := c.Now()
 	after := c.Now()
 	if before != after {
-		t.Errorf("Now changed clock: %d → %d", before, after)
+		t.Errorf("Now changed clock: %d -> %d", before, after)
 	}
 	if before != 2 {
 		t.Errorf("Now = %d, want 2", before)
@@ -134,7 +134,7 @@ func TestLamportClock_Concurrent(t *testing.T) {
 	}
 }
 
-// ── VectorClock ───────────────────────────────────────────────────────────────
+// -- VectorClock ---------------------------------------------------------------
 
 // TestVectorClock_Increment verifies that Increment updates only the specified
 // node and returns a new copy without modifying the original.
@@ -284,13 +284,13 @@ func TestVectorClock_Concurrent(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "a before b — not concurrent",
+			name: "a before b - not concurrent",
 			a:    clock.VectorClock{"n1": 1},
 			b:    clock.VectorClock{"n1": 2},
 			want: false,
 		},
 		{
-			name: "equal — not concurrent",
+			name: "equal - not concurrent",
 			a:    clock.VectorClock{"n1": 3},
 			b:    clock.VectorClock{"n1": 3},
 			want: false,
@@ -334,7 +334,7 @@ func TestVectorClock_Equal(t *testing.T) {
 }
 
 // TestVectorClock_HappensBefore_Transitivity verifies that happens-before is
-// transitive: if a→b and b→c then a→c.
+// transitive: if a->b and b->c then a->c.
 func TestVectorClock_HappensBefore_Transitivity(t *testing.T) {
 	a := clock.VectorClock{"n1": 1, "n2": 0}
 	b := clock.VectorClock{"n1": 2, "n2": 1}
@@ -347,6 +347,6 @@ func TestVectorClock_HappensBefore_Transitivity(t *testing.T) {
 		t.Error("b should happen before c")
 	}
 	if !a.HappensBefore(c) {
-		t.Error("a → b → c but a does not happen before c (transitivity violated)")
+		t.Error("a -> b -> c but a does not happen before c (transitivity violated)")
 	}
 }

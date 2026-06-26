@@ -130,7 +130,7 @@ func (n *Node) advanceCommitIndex() {
 	}
 	newCommit := indices[quorum-1]
 
-	// Only advance for entries from the current term (§5.4.2).
+	// Only advance for entries from the current term (section 5.4.2).
 	if newCommit > n.commitIndex {
 		t, err := n.log.Term(newCommit)
 		if err == nil && t == n.currentTerm {
@@ -141,7 +141,7 @@ func (n *Node) advanceCommitIndex() {
 	}
 }
 
-// HandleAppendEntries processes an inbound AppendEntries RPC (§5.3).
+// HandleAppendEntries processes an inbound AppendEntries RPC (section 5.3).
 func (n *Node) HandleAppendEntries(_ context.Context, args AppendEntriesArgs) (AppendEntriesReply, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()

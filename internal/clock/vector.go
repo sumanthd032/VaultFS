@@ -39,10 +39,10 @@ func (vc VectorClock) Merge(other VectorClock) VectorClock {
 	return result
 }
 
-// HappensBefore reports whether vc causally precedes other (vc → other).
+// HappensBefore reports whether vc causally precedes other (vc -> other).
 //
-// vc → other iff:
-//   - vc[i] ≤ other[i] for all nodes i, AND
+// vc -> other iff:
+//   - vc[i] <= other[i] for all nodes i, AND
 //   - vc[j] < other[j] for at least one node j.
 //
 // Missing keys are treated as 0.
@@ -66,7 +66,7 @@ func (vc VectorClock) HappensBefore(other VectorClock) bool {
 	return atLeastOneStrict
 }
 
-// Concurrent reports whether vc and other are causally unrelated — neither
+// Concurrent reports whether vc and other are causally unrelated - neither
 // happens before the other and they are not equal.
 func (vc VectorClock) Concurrent(other VectorClock) bool {
 	return !vc.HappensBefore(other) && !other.HappensBefore(vc) && !vc.Equal(other)

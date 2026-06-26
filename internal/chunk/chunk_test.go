@@ -19,7 +19,7 @@ func newTestStore(t *testing.T) *Store {
 	return s
 }
 
-// ── hasher ───────────────────────────────────────────────────────────────────
+// -- hasher -------------------------------------------------------------------
 
 func TestHashDeterministic(t *testing.T) {
 	a := Hash([]byte("hello"))
@@ -79,7 +79,7 @@ func TestChunkIDValid(t *testing.T) {
 	}
 }
 
-// ── store roundtrip ──────────────────────────────────────────────────────────
+// -- store roundtrip ----------------------------------------------------------
 
 func TestStoreWriteReadRoundtrip(t *testing.T) {
 	s := newTestStore(t)
@@ -241,7 +241,7 @@ func TestStoreConcurrentWrites(t *testing.T) {
 	wg.Wait()
 }
 
-// ── replication ──────────────────────────────────────────────────────────────
+// -- replication --------------------------------------------------------------
 
 // fakeSender routes SendChunk to an in-memory map of node replicators,
 // simulating a pipeline of chunk servers.
@@ -316,7 +316,7 @@ func TestReplicationChainFailurePropagates(t *testing.T) {
 	}
 }
 
-// ── garbage collection ───────────────────────────────────────────────────────
+// -- garbage collection -------------------------------------------------------
 
 // fakeRefs is a ReferenceChecker backed by a fixed set of referenced chunk IDs.
 type fakeRefs struct {
@@ -416,7 +416,7 @@ func TestGCResetsTimerWhenReReferenced(t *testing.T) {
 	}
 }
 
-// ── heartbeat sender ─────────────────────────────────────────────────────────
+// -- heartbeat sender ---------------------------------------------------------
 
 // fakeReporter records heartbeat inventories and signals on a channel.
 type fakeReporter struct {

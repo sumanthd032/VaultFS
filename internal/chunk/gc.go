@@ -23,9 +23,9 @@ type GC struct {
 	refs  ReferenceChecker
 	grace time.Duration
 
-	mu          sync.Mutex          // protects orphanedAt
-	orphanedAt  map[ChunkID]time.Time // chunk → first time it was seen orphaned
-	now         func() time.Time      // injectable clock for tests
+	mu         sync.Mutex            // protects orphanedAt
+	orphanedAt map[ChunkID]time.Time // chunk -> first time it was seen orphaned
+	now        func() time.Time      // injectable clock for tests
 }
 
 // NewGC returns a garbage collector for store. Chunks unreferenced by refs are

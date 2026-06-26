@@ -76,7 +76,7 @@ func TestMonitorSweepNoDeadNoTasks(t *testing.T) {
 	m.now = func() time.Time { return base }
 	m.RecordHeartbeat("A")
 
-	// Within timeout — no node is dead, so no re-replication is triggered even
+	// Within timeout - no node is dead, so no re-replication is triggered even
 	// though c1 is under-replicated. Re-replication is driven by failures, not
 	// by steady-state under-replication in this path.
 	dead, tasks := m.Sweep()

@@ -230,8 +230,8 @@ func TestWALCrashRecovery_TruncatedEntry(t *testing.T) {
 	}
 }
 
-// TestWALCRCCorruption verifies that a bit-flipped CRC causes the entry—and
-// all subsequent entries—to be discarded during recovery.
+// TestWALCRCCorruption verifies that a bit-flipped CRC causes the entry (and
+// all subsequent entries) to be discarded during recovery.
 func TestWALCRCCorruption(t *testing.T) {
 	dir := t.TempDir()
 
@@ -345,7 +345,7 @@ func TestWALSegmentRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(segs) < 2 {
-		t.Fatalf("want ≥2 segment files after rotation, got %d", len(segs))
+		t.Fatalf("want >=2 segment files after rotation, got %d", len(segs))
 	}
 
 	entries, err := w.ReadAll()
